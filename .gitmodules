@@ -1,0 +1,3 @@
+[submodule "cloudify_plugin_chef/tests/cookbooks/create-file"]
+	path = cloudify_plugin_chef/tests/cookbooks/create-file
+	url = https://github.com/ilyash/cookbook-create-file.git
