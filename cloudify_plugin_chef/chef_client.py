@@ -102,6 +102,18 @@ class ChefManager(object):
 
         self._install_files(ctx)
 
+    # XXX: fetch ohai plugin from file server
+    def install_ohai_plugin(self, ctx):
+        out, _ = self._sudo(ctx, 'ohai')
+        data = json.loads(out)
+        ohai_root = data['chef_packages']['ohai']['ohai_root']
+        plugins_source_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ohai', 'plugins')
+        plugins_destination_path = os.path.join(ohai_root)
+
+        subprocess.Popen(
+            ['sudo', 'cp', '-r', plugins_source_path, plugins_destination_path])
+
+
     def uninstall(self, ctx):
         """Uninstall chef-client - currently only supporting apt-get"""
         #TODO: I didn't find a single method encouraged by opscode,
@@ -122,6 +134,7 @@ class ChefManager(object):
         self._prepare_for_run(ctx, runlist)
         self.attribute_file = tempfile.NamedTemporaryFile(suffix="chef_attributes.json",
                                                           delete=False)
+        # print(json.dumps(chef_attributes))
         json.dump(chef_attributes, self.attribute_file)
         self.attribute_file.close()
 
@@ -166,10 +179,16 @@ class ChefManager(object):
         #      per log level? Also see comment under run_chef()
         stdout = tempfile.TemporaryFile('rw+b')
         stderr = tempfile.TemporaryFile('rw+b')
+        out = None
+        err = None
         try:
             subprocess.check_call(cmd, stdout=stdout, stderr=stderr)
-            ctx.logger.info("Chef stdout follows: \n%s", get_file_contents(stdout))
-            ctx.logger.info("Chef stderr follows: \n%s", get_file_contents(stderr))
+            out = get_file_contents(stdout)
+            err = get_file_contents(stderr)
+            if out:
+                ctx.logger.info("Chef stdout follows: \n%s", out)
+            if err:
+                ctx.logger.info("Chef stderr follows: \n%s", err)
         except subprocess.CalledProcessError as exc:
             raise SudoError("{exc}\nSTDOUT:\n{stdout}\nSTDERR:{stderr}".format(
                 exc=exc, stdout=get_file_contents(stdout), stderr=get_file_contents(stderr))
@@ -177,6 +196,8 @@ class ChefManager(object):
         finally:
             stdout.close()
             stderr.close()
+
+        return out, err
 
     def _sudo_write_file(self, ctx, filename, contents):
         """a helper to create a file with sudo"""
@@ -293,14 +314,22 @@ def get_manager(ctx):
     raise ChefError("Failed to find appropriate Chef manager for the specified arguments ({0}). Possible arguments sets are: {1}".format(ctx.properties, arguments_sets))
 
 
+def _context_to_struct(ctx):
+    return {
+        'node_id': ctx.node_id,
+        'runtime_properties': ctx.runtime_properties,
+        'capabilities': ctx.capabilities.get_all(),
+    }
+
 def run_chef(ctx, runlist):
-    chef_attributes = ctx.properties.get('chef_attributes', {})
-    """Run runlist with chef-client using these chef_attributes(json or dict)"""
-    # I considered moving the attribute handling to the set-up phase but
-    # eventually left it here, to allow specific tasks to easily override them.
+    """Run given runlist using Chef.
+    ctx.properties.chef_attributes can be a dict or a JSON.
+    """
 
     if runlist is None:
         return
+
+    chef_attributes = ctx.properties.get('chef_attributes', {})
 
     # If chef_attributes is JSON
     if isinstance(chef_attributes, basestring) and chef_attributes != '':
@@ -308,6 +337,14 @@ def run_chef(ctx, runlist):
             chef_attributes = json.loads(chef_attributes)
         except ValueError:
             raise ChefError("Failed json validation of chef chef_attributes:\n%s" % chef_attributes)
+
+    if 'cloudify' in chef_attributes:
+        raise ValueError("Chef attributes must not contain 'cloudify'")
+
+    chef_attributes['cloudify'] = _context_to_struct(ctx)
+
+    if ctx.related:
+        chef_attributes['cloudify']['related'] = _context_to_struct(ctx.related)
 
     chef_manager = get_manager(ctx)
     chef_manager.install(ctx)

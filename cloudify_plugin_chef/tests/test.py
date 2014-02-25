@@ -61,7 +61,7 @@ class ChefPluginTest(object):
             node_id='clodufiy_app_node_id',
             operation='cloudify.interfaces.lifecycle.' +
             (operation or 'INVALID'),
-            properties=props
+            properties=props,
         )
         return ctx
 
@@ -76,6 +76,9 @@ class ChefPluginTest(object):
         m = re.match('^Chef: ([0-9.]+)', output)
         expected_version, _, _ = tests_config['solo']['properties']['chef_version'].partition('-')
         self.assertEquals(m.group(1), expected_version)
+
+        # TEMP!!!
+        chef_manager.install_ohai_plugin(ctx)
 
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')
