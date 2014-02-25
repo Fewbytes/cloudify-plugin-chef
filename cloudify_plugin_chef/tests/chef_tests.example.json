@@ -1,0 +1,29 @@
+{
+  "solo": {
+    "properties": {
+      "chef_version": "11.4.4-2",
+      "chef_cookbooks": "http://127.0.0.1:50000/cookbooks.tar.gz",
+      "chef_attributes": {
+      },
+      "runlists": {
+          "install": "recipe[create-file]"
+      }
+    }
+  },
+  "client": {
+    "comment_required_args_for_client": "chef_server_url, chef_validator_name, chef_validation, chef_environment",
+    "comment_chef_validation": "cat _chef/v.pem | sed 's/$/\\n/' | tr -d '\n'",
+    "properties": {
+      "chef_version": "11.4.4-2",
+      "chef_server_url": "https://YOUR_CHEF_SERVER_IP:443",
+      "chef_validator_name": "chef-validator",
+      "chef_validation": "-----BEGIN RSA PRIVATE KEY-----\n...-----END RSA PRIVATE KEY-----\n",
+      "chef_environment": "_default",
+      "chef_attributes": {
+      },
+      "runlists": {
+          "install": "recipe[create-file]"
+      }
+    }
+  }
+}

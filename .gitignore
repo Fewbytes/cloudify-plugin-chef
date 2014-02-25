@@ -1,2 +1,3 @@
 *.iml
 *.tar.gz
+chef_tests.json
