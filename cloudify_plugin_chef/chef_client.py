@@ -321,6 +321,32 @@ def _context_to_struct(ctx):
         'capabilities': ctx.capabilities.get_all(),
     }
 
+def _process_rel_runtime_props(ctx, data):
+    ret = {}
+    for k, v in data.items():
+        print(k, v)
+        if isinstance(v, dict) and 'related_runtime_property' in v:
+
+            # Nothing to fetch. Use default_value if provided.
+            if not ctx.related or v.get('of_node', related.node_name) != related.node_name:
+                if 'default_value' in v:
+                    ret[k] = v['default_value']
+                continue
+
+            path = v['related_runtime_property'].split('.')
+            ptr = ctx.related.runtime_properties
+            try:
+                while path:
+                    ptr = ptr[path.pop(0)]
+            except KeyError:
+                raise KeyError("Runtime propery '{0}' not found in related "
+                               "node {1}".format(v['related_runtime_property'], ctx))
+            ret[k] = ptr
+        else:
+            ret[k] = v
+    return ret
+
+
 def run_chef(ctx, runlist):
     """Run given runlist using Chef.
     ctx.properties.chef_attributes can be a dict or a JSON.
@@ -345,6 +371,8 @@ def run_chef(ctx, runlist):
 
     if ctx.related:
         chef_attributes['cloudify']['related'] = _context_to_struct(ctx.related)
+
+    chef_attributes = _process_rel_runtime_props(ctx, chef_attributes)
 
     chef_manager = get_manager(ctx)
     chef_manager.install(ctx)
