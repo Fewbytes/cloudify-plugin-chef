@@ -322,28 +322,40 @@ def _context_to_struct(ctx):
     }
 
 def _process_rel_runtime_props(ctx, data):
+    if not isinstance(data, dict):
+        return data
     ret = {}
     for k, v in data.items():
-        print(k, v)
-        if isinstance(v, dict) and 'related_runtime_property' in v:
+        path = None
+        if isinstance(v, dict):
+            if 'related_chef_attribute' in v:
+                path = ['chef_attributes'] + v['related_chef_attribute'].split('.')
 
+            if 'related_runtime_property' in v:
+                path = v['related_runtime_property'].split('.')
+
+        if path:
             # Nothing to fetch. Use default_value if provided.
-            if not ctx.related or v.get('of_node', related.node_name) != related.node_name:
+            if not ctx.related or v.get('of_node', ctx.related.node_name) != ctx.related.node_name:
                 if 'default_value' in v:
                     ret[k] = v['default_value']
                 continue
 
-            path = v['related_runtime_property'].split('.')
             ptr = ctx.related.runtime_properties
             try:
                 while path:
+                    # print("K={} V={} PATH={} PTR={}".format(k, v, path, ptr))
                     ptr = ptr[path.pop(0)]
             except KeyError:
-                raise KeyError("Runtime propery '{0}' not found in related "
-                               "node {1}".format(v['related_runtime_property'], ctx))
+                if 'default_value' in v:
+                    ret[k] = v['default_value']
+                    continue
+                else:
+                    raise KeyError("Runtime propery {0} not found in related "
+                                   "node {1}".format(path, ctx))
             ret[k] = ptr
         else:
-            ret[k] = v
+            ret[k] = _process_rel_runtime_props(ctx, v)
     return ret
 
 
@@ -357,6 +369,9 @@ def run_chef(ctx, runlist):
 
     chef_attributes = ctx.properties.get('chef_attributes', {})
 
+    if 'cloudify' in chef_attributes:
+        raise ValueError("Chef attributes must not contain 'cloudify'")
+
     # If chef_attributes is JSON
     if isinstance(chef_attributes, basestring) and chef_attributes != '':
         try:
@@ -364,9 +379,7 @@ def run_chef(ctx, runlist):
         except ValueError:
             raise ChefError("Failed json validation of chef chef_attributes:\n%s" % chef_attributes)
 
-    if 'cloudify' in chef_attributes:
-        raise ValueError("Chef attributes must not contain 'cloudify'")
-
+    chef_attributes = chef_attributes.copy()
     chef_attributes['cloudify'] = _context_to_struct(ctx)
 
     if ctx.related:

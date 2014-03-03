@@ -1,4 +1,4 @@
-from cloudify.decorators import operation
+from cloudify.decorators import operation as _operation
 
 from cloudify_plugin_chef.chef_client import run_chef
 
@@ -21,15 +21,15 @@ def _extract_op(ctx):
     return op
 
 # Remember: attributes
-@operation
-def node_operation(ctx, **kwargs):
+@_operation
+def operation(ctx, **kwargs):
     op = _extract_op(ctx)
+    if not ctx.properties['runlists'].get(op):
+        ctx.logger.info("Runlist for operation {0} does not exist or "
+                        "is empty. Node: {1}".format(op, ctx.node_name))
+
     run_chef(ctx, ctx.properties['runlists'][op])
 
     report_method = operations_report_method.get(op)
     if report_method:
         getattr(ctx, report_method)()
-
-@operation
-def relation_operation(ctx, **kwargs):
-    raise NotImplemented("cloudify_plugin_chef.relation_operation() is not implemented yet")
