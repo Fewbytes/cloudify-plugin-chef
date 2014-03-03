@@ -164,6 +164,13 @@ class ChefManager(object):
             which_exitcode = subprocess.call(["/usr/bin/sudo", "which", prog], stdout=fnull, stderr=fnull)
         return which_exitcode == 0
 
+    def _log_text(self, ctx, title, prefix, text):
+        if not text:
+            return
+        ctx.logger.info('*** ' + title + ' ***')
+        for line in text.splitlines():
+            ctx.logger.info(prefix + line)
+
     def _sudo(self, ctx, *args):
         """a helper to run a subprocess with sudo, raises SudoError"""
 
@@ -185,10 +192,8 @@ class ChefManager(object):
             subprocess.check_call(cmd, stdout=stdout, stderr=stderr)
             out = get_file_contents(stdout)
             err = get_file_contents(stderr)
-            if out:
-                ctx.logger.info("Chef stdout follows: \n%s", out)
-            if err:
-                ctx.logger.info("Chef stderr follows: \n%s", err)
+            self._log_text(ctx, "Chef stdout", "  [out] ", out)
+            self._log_text(ctx, "Chef stderr", "  [err] ", err)
         except subprocess.CalledProcessError as exc:
             raise SudoError("{exc}\nSTDOUT:\n{stdout}\nSTDERR:{stderr}".format(
                 exc=exc, stdout=get_file_contents(stdout), stderr=get_file_contents(stderr))
