@@ -100,7 +100,7 @@ class ChefPluginInstallationTest(ChefPluginTest):
         self.assertEquals(m.group(1), expected_version)
 
         # TEMP!!!
-        chef_manager.install_ohai_plugin(ctx)
+        chef_manager.install_chef_handler(ctx)
 
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')

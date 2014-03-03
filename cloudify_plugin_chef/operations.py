@@ -25,8 +25,10 @@ def _extract_op(ctx):
 def operation(ctx, **kwargs):
     op = _extract_op(ctx)
     if not ctx.properties['runlists'].get(op):
-        ctx.logger.info("Runlist for operation {0} does not exist or "
-                        "is empty. Node: {1}".format(op, ctx.node_name))
+        ctx.logger.info("Chef runlist for operation {0} does not exist or "
+                        "is empty".format(op))
+
+    ctx.logger.info("Using Chef runlist {0}".format(op))
 
     run_chef(ctx, ctx.properties['runlists'][op])
 
