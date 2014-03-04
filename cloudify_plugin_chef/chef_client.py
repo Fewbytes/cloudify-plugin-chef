@@ -388,13 +388,7 @@ def _process_rel_runtime_props(ctx, data):
     return ret
 
 
-def run_chef(ctx, runlist):
-    """Run given runlist using Chef.
-    ctx.properties.chef_attributes can be a dict or a JSON.
-    """
-
-    if runlist is None:
-        return
+def _prepare_chef_attributes(ctx):
 
     chef_attributes = ctx.properties.get('chef_attributes', {})
 
@@ -413,20 +407,37 @@ def run_chef(ctx, runlist):
     chef_attributes = chef_attributes.copy()
     chef_attributes['cloudify'] = _context_to_struct(ctx)
 
-    t = 'cloudify_chef_attrs_out.{0}.{1}.{2}.'.format(
-        ctx.node_name, ctx.node_id, os.getpid())
-    t = tempfile.NamedTemporaryFile(prefix=t, suffix='.json', delete=False)
-    chef_attributes['cloudify']['attributes_output_file'] = t.name
-
-    ctx.logger.debug("Using attributes_output_file: {0}".format(t.name))
-
     if ctx.related:
         chef_attributes['cloudify']['related'] = _context_to_struct(ctx.related)
 
     chef_attributes = _process_rel_runtime_props(ctx, chef_attributes)
 
+    return chef_attributes
+
+def run_chef(ctx, runlist):
+    """Run given runlist using Chef.
+    ctx.properties.chef_attributes can be a dict or a JSON.
+    """
+
+    if runlist is None:
+        return
+
+    chef_attributes = _prepare_chef_attributes(ctx)
+
+    t = 'cloudify_chef_attrs_out.{0}.{1}.{2}.'.format(
+        ctx.node_name, ctx.node_id, os.getpid())
+    attrs_tmp_file = tempfile.NamedTemporaryFile(prefix=t, suffix='.json', delete=False)
+    chef_attributes['cloudify']['attributes_output_file'] = attrs_tmp_file.name
+
+    ctx.logger.debug("Using attributes_output_file: {0}".format(attrs_tmp_file.name))
     chef_manager = get_manager(ctx)
     chef_manager.install(ctx)
     chef_manager.run(ctx, runlist, chef_attributes)
 
-    # os.remove(t.name)
+    with open(attrs_tmp_file.name) as f:
+        chef_output_attributes = json.load(f)
+
+    del chef_output_attributes['cloudify']['runtime_properties']
+    ctx.runtime_properties['chef_attributes'] = chef_output_attributes
+
+    os.remove(attrs_tmp_file.name)

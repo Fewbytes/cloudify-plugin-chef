@@ -32,15 +32,6 @@ os.environ.setdefault('CHEF_TESTS_CONFIG_PATH',
 
 tests_config = TestsConfig().get()
 
-_orig_process_rel_runtime_props = chef_client._process_rel_runtime_props
-def _mock_process_rel_runtime_props(cb):
-    @wraps(_orig_process_rel_runtime_props)
-    def f(*args, **kwargs):
-        ret = _orig_process_rel_runtime_props(*args, **kwargs)
-        cb(ret)
-        return ret
-    return f
-
 def _make_context(installation_type='solo', operation=None, merge_chef_attributes=None, related=None):
     props = tests_config[installation_type]['properties']
     props.setdefault('chef_attributes', {})
@@ -59,6 +50,12 @@ def _make_context(installation_type='solo', operation=None, merge_chef_attribute
 
 class ChefPluginTest(object):
 
+    def _make_context(self, operation=None, merge_chef_attributes=None):
+        return _make_context(self.__class__.INSTALLATION_TYPE, operation, merge_chef_attributes)
+
+
+class ChefPluginWithHTTPServer(ChefPluginTest):
+
     def setUp(self):
         if os.getuid() == 0:
             raise RuntimeError(
@@ -72,20 +69,13 @@ class ChefPluginTest(object):
         subprocess.call(['fuser', '-s', '-k', FILE_SERVER_PORT + '/tcp'])
         subprocess.Popen(
             ['python', '-m', 'SimpleHTTPServer', FILE_SERVER_PORT])
-        chef_client._process_rel_runtime_props = _mock_process_rel_runtime_props(self._note_runtime_properties)
         # subprocess.call(['fuser', '-k', FILE_SERVER_PORT + '/tcp'])
-
-    def _note_runtime_properties(self, v):
-        self._last_processed_rel_runtime_props = v
 
     def tearDown(self):
         subprocess.call(['fuser', '-s', '-k', FILE_SERVER_PORT + '/tcp'])
 
-    def _make_context(self, operation=None, merge_chef_attributes=None):
-        return _make_context(self.__class__.INSTALLATION_TYPE, operation, merge_chef_attributes)
 
-
-class ChefPluginInstallationTest(ChefPluginTest):
+class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
 
     def test_chef_installation(self):
         """Run Chef installation and check for expected"""
@@ -140,9 +130,13 @@ class ChefPluginAttrubutesPassingTestBase(object):
             related = None
         ctx = _make_context(operation='install', merge_chef_attributes=merge_chef_attributes, related=related)
         if expect_exception:
-            self.assertRaises(expect_exception, chef_operations.operation, ctx)
+            self.assertRaises(expect_exception, chef_client._prepare_chef_attributes, ctx)
         else:
-            chef_operations.operation(ctx)
+            return chef_client._prepare_chef_attributes(ctx)
+
+    def test_node_match(self):
+        pass
+
 
 def _make_test(h):
     def test_method(self):
@@ -152,21 +146,21 @@ def _make_test(h):
         else:
             test_args = h[:-1]
             confirmator = h[-1]
-        self._run(*test_args)
+        v = self._run(*test_args)
         if confirmator:
-            confirmator(self, "Failed for args {0}".format(test_args))
+            confirmator(self, v, "Failed for args {0}".format(test_args))
     test_method.__name__ = 'test_' + '_'.join(map(str, h[:-1]))
     return test_method
 
-def _make_value_confirmer(v):
-    def f(self, msg):
-        self.assertIn('attr1', self._last_processed_rel_runtime_props)
-        self.assertEquals(self._last_processed_rel_runtime_props['attr1'], v)
-    f.__name__ = 'value_confirmer_{0}'.format(v)
+def _make_value_confirmer(expected_value):
+    def f(self, v, msg):
+        self.assertIn('attr1', v)
+        self.assertEquals(v['attr1'], expected_value)
+    f.__name__ = 'value_confirmer_{0}'.format(expected_value)
     return f
 
-def _confirm_no_attr(self, msg):
-    self.assertNotIn('attr1', self._last_processed_rel_runtime_props, msg)
+def _confirm_no_attr(self, v, msg):
+    self.assertNotIn('attr1', v, msg)
 
 _confirm_default_val = _make_value_confirmer('attr1_default_val')
 _confirm_prop_val = _make_value_confirmer('prop_val')
@@ -234,6 +228,17 @@ class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
             chef_manager.run(ctx, '', ctx.properties['chef_attributes'])
         except chef_client.ChefError:
             self.fail("Chef run failed")
+
+
+class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer, unittest.TestCase):
+
+    def test_attributes_capture(self):
+        ctx = _make_context(operation='install')
+        chef_operations.operation(ctx)
+        self.assertIn('chef_attributes', ctx.runtime_properties)
+        for a in 'roles', 'recipes', 'tags':
+            self.assertIn(a, ctx.runtime_properties['chef_attributes'])
+
 
 if __name__ == '__main__':
     unittest.main()
