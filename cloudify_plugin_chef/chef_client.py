@@ -365,7 +365,7 @@ def _process_rel_runtime_props(ctx, data):
 
         if path:
             # Nothing to fetch. Use default_value if provided.
-            if not ctx.related or v.get('of_node', ctx.related.node_name) != ctx.related.node_name:
+            if not ctx.related:
                 if 'default_value' in v:
                     ret[k] = v['default_value']
                 continue
