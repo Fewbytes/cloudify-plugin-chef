@@ -17,7 +17,7 @@ def _extract_op(ctx):
             "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefx))
     if op not in ctx.properties['chef_config']['runlists']:
         raise ValueError("runlists do not have an entry for operation '{0}', "
-            "only {1}".format(op, ','.join(ctx.properties['runlists'].keys())))
+            "only {1}".format(op, ','.join(ctx.properties['chef_config']['runlists'].keys())))
     return op
 
 # Remember: attributes

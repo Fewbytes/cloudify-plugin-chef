@@ -43,7 +43,7 @@ def _make_context(installation_type='solo', operation=None, merge_chef_attribute
         node_id='clodufiy_app_node_id',
         operation='cloudify.interfaces.lifecycle.' +
         (operation or 'INVALID'),
-        properties=props,
+        properties={'chef_config': props},
         related=related
     )
     return ctx
@@ -95,7 +95,7 @@ class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')
         chef_operations.operation(ctx)
-        create_file_attrs = ctx.properties['chef_attributes']['create_file']
+        create_file_attrs = ctx.properties['chef_config']['chef_attributes']['create_file']
         f = create_file_attrs['file_name']
         c = create_file_attrs['file_contents']
         self.assertEquals(open(f).read(), c)
@@ -225,7 +225,7 @@ class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
         chef_manager = chef_client.get_manager(ctx)
         self.assertIsInstance(chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
         try:
-            chef_manager.run(ctx, '', ctx.properties['chef_attributes'])
+            chef_manager.run(ctx, '', ctx.properties['chef_config']['chef_attributes'])
         except chef_client.ChefError:
             self.fail("Chef run failed")
 
