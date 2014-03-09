@@ -19,5 +19,8 @@ setuptools.setup(
         "cosmo-celery-common",
         "requests",
     ],
+    package_data={
+        'cloudify_plugin_chef': ['chef/handler/cloudify_attributes_to_json_file.rb']
+    },
     dependency_links=["{0}#egg=cosmo-celery-common-{1}".format(COSMO_CELERY, COSMO_CELERY_VERSION)]
 )
