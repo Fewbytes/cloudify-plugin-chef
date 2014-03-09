@@ -16,21 +16,23 @@ def _extract_op(ctx):
         ctx.warn("Node operation is expected to start with '{0}' "
             "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefx))
     if op not in ctx.properties['chef_config']['runlists']:
-        raise ValueError("runlists do not have an entry for operation '{0}', "
+        raise ValueError("chef_config.runlists do not have an entry for operation '{0}', "
             "only {1}".format(op, ','.join(ctx.properties['chef_config']['runlists'].keys())))
     return op
 
 # Remember: attributes
 @_operation
 def operation(ctx, **kwargs):
-    op = _extract_op(ctx)
-    if not ctx.properties['chef_config']['runlists'].get(op):
-        ctx.logger.info("Chef runlist for operation {0} does not exist or "
-                        "is empty".format(op))
 
-    ctx.logger.info("Using Chef runlist {0}".format(op))
+    if 'runlist' in ctx.properties['chef_config']:
+        runlist = ctx.properties['chef_config']['runlist']
+    else:
+        op = _extract_op(ctx)
+        ctx.logger.info("Using Chef runlist for operation {0}".format(op))
+        runlist = ctx.properties['chef_config']['runlists'][op]
 
-    run_chef(ctx, ctx.properties['chef_config']['runlists'][op])
+    ctx.logger.info("Chef runlist: {0}".format(runlist))
+    run_chef(ctx, runlist)
 
     report_method = operations_report_method.get(op)
     if report_method:
