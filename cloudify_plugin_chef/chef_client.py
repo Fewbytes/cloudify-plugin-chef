@@ -119,9 +119,7 @@ class ChefManager(object):
         chef_root = self.get_chef_root(ctx)
         handlers_source_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'chef', 'handler')
         handlers_destination_path = os.path.join(os.path.join(chef_root), 'chef')
-
-        subprocess.Popen(
-            ['sudo', 'cp', '-r', handlers_source_path, handlers_destination_path])
+        self._sudo(ctx, 'cp', '-r', handlers_source_path, handlers_destination_path)
 
     def get_chef_handler_config(self, ctx):
         s = (
