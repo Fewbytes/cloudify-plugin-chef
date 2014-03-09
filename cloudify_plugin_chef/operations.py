@@ -4,19 +4,13 @@ from cloudify_plugin_chef.chef_client import run_chef
 
 EXPECTED_OP_PREFIX = 'cloudify.interfaces.lifecycle'
 
-# op -> ctx.method
-operations_report_method = {
-    'start': 'set_started',
-    'stop': 'set_stop',
-}
-
 def _extract_op(ctx):
     prefix, _, op = ctx.operation.rpartition('.')
     if prefix != EXPECTED_OP_PREFIX:
         ctx.warn("Node operation is expected to start with '{0}' "
             "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefx))
     if op not in ctx.properties['chef_config']['runlists']:
-        raise ValueError("chef_config.runlists do not have an entry for operation '{0}', "
+        raise ValueError("chef_config.runlists does not have an entry for operation '{0}', "
             "only {1}".format(op, ','.join(ctx.properties['chef_config']['runlists'].keys())))
     return op
 
@@ -33,7 +27,3 @@ def operation(ctx, **kwargs):
 
     ctx.logger.info("Chef runlist: {0}".format(runlist))
     run_chef(ctx, runlist)
-
-    report_method = operations_report_method.get(op)
-    if report_method:
-        getattr(ctx, report_method)()
