@@ -19,11 +19,15 @@ def _extract_op(ctx):
 def operation(ctx, **kwargs):
 
     if 'runlist' in ctx.properties['chef_config']:
+        ctx.logger.info("Using explicitly provided Chef runlist")
         runlist = ctx.properties['chef_config']['runlist']
     else:
         op = _extract_op(ctx)
         ctx.logger.info("Using Chef runlist for operation {0}".format(op))
         runlist = ctx.properties['chef_config']['runlists'][op]
+
+    if isinstance(runlist, list):
+        runlist = ','.join(runlist)
 
     ctx.logger.info("Chef runlist: {0}".format(runlist))
     run_chef(ctx, runlist)
