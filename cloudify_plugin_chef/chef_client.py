@@ -103,6 +103,7 @@ class ChefManager(object):
             self._sudo(ctx, "mkdir", "-p", directory)
 
         self._install_files(ctx)
+        self.install_chef_handler(ctx)
 
     def get_chef_root(self, ctx):
         """ Maybe not the brightest idea to place it in a dpkg managed
@@ -114,7 +115,6 @@ class ChefManager(object):
         chef_root = data['chef_packages']['chef']['chef_root']
         return chef_root
 
-    # XXX: fetch chef handler from file server
     def install_chef_handler(self, ctx):
         chef_root = self.get_chef_root(ctx)
         handlers_source_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'chef', 'handler')
