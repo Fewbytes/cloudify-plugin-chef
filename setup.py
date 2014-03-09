@@ -8,15 +8,14 @@ COSMO_CELERY = "https://github.com/CloudifySource/cosmo-celery-common/tarball/{0
 
 setuptools.setup(
     zip_safe=False,
-    name='cosmo-plugin-chef-client-common',
+    name='cosmo-plugin-chef',
     version='0.1.0',
-    author='yoni',
-    author_email='yoni@fewbytes.com',
-    packages=['chef_client_common'],
+    author='ilya',
+    author_email='ilya.sher@coding-knight.com',
+    packages=['cloudify_plugin_chef'],
     license='LICENSE',
-    description='Common code for chef related cosmo plugins',
+    description='Cloudify Chef plugin',
     install_requires=[
-        "celery",
         "cosmo-celery-common",
         "requests",
     ],
