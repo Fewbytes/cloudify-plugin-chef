@@ -9,9 +9,6 @@ def _extract_op(ctx):
     if prefix != EXPECTED_OP_PREFIX:
         ctx.warn("Node operation is expected to start with '{0}' "
             "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefx))
-    if op not in ctx.properties['chef_config']['runlists']:
-        raise ValueError("chef_config.runlists does not have an entry for operation '{0}', "
-            "only {1}".format(op, ','.join(ctx.properties['chef_config']['runlists'].keys())))
     return op
 
 # Remember: attributes
@@ -23,8 +20,10 @@ def operation(ctx, **kwargs):
         runlist = ctx.properties['chef_config']['runlist']
     else:
         op = _extract_op(ctx)
+        if op not in ctx.properties['chef_config']['runlists']:
+            ctx.logger.warn("No Chef runlist for operation {0}".format(op))
         ctx.logger.info("Using Chef runlist for operation {0}".format(op))
-        runlist = ctx.properties['chef_config']['runlists'][op]
+        runlist = ctx.properties['chef_config']['runlists'].get(op)
 
     if isinstance(runlist, list):
         runlist = ','.join(runlist)
