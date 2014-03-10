@@ -152,7 +152,10 @@ class ChefManager(object):
 
     def run(self, ctx, runlist, chef_attributes):
         self._prepare_for_run(ctx, runlist)
-        self.attribute_file = tempfile.NamedTemporaryFile(suffix="chef_attributes.json",
+        t = 'cloudify_chef_attrs_in.{0}.{1}.{2}.'.format(
+            ctx.node_name, ctx.node_id, os.getpid())
+        self.attribute_file = tempfile.NamedTemporaryFile(prefix=t,
+                                                          suffix=".json",
                                                           delete=False)
         # print(json.dumps(chef_attributes))
         json.dump(chef_attributes, self.attribute_file)
