@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
+import copy
 from functools import wraps
+import itertools
 import os
 import random
 import re
@@ -32,15 +34,18 @@ os.environ.setdefault('CHEF_TESTS_CONFIG_PATH',
 
 tests_config = TestsConfig().get()
 
+node_id = itertools.count(100)
+
+
 def _make_context(installation_type='solo', operation=None, merge_chef_attributes=None, related=None):
-    props = tests_config[installation_type]['properties']
+    props = copy.deepcopy(tests_config[installation_type]['properties'])
     props.setdefault('chef_attributes', {})
     props['chef_attributes'].setdefault('create_file', {})
     props['chef_attributes']['create_file'].setdefault('file_name', CHEF_CREATED_FILE_NAME)
     props['chef_attributes']['create_file'].setdefault('file_contents', CHEF_CREATED_FILE_CONTENTS)
     props['chef_attributes'].update(merge_chef_attributes or {})
     ctx = MockCloudifyContext(
-        node_id='clodufiy_app_node_id',
+        node_id='clodufiy_app_node_id_' + str(node_id.next()),
         operation='cloudify.interfaces.lifecycle.' +
         (operation or 'INVALID'),
         properties={'chef_config': props},
@@ -123,19 +128,43 @@ class ChefPluginAttrubutesPassingTestBase(object):
                     'prop1': 'chef_attr_val'
                 }
             related = MockCloudifyContext(
-                node_id='clodufiy_db_node_id',
+                node_id='clodufiy_db_node_id_' + str(node_id.next()),
                 runtime_properties=runtime_properties,
             )
         else:
             related = None
+        # print("MERGE_CHEF_ATTRIBUTES", merge_chef_attributes)
         ctx = _make_context(operation='install', merge_chef_attributes=merge_chef_attributes, related=related)
+        # print("CTX", str(ctx), "RELATED", str(related))
         if expect_exception:
             self.assertRaises(expect_exception, chef_client._prepare_chef_attributes, ctx)
         else:
             return chef_client._prepare_chef_attributes(ctx)
 
-    def test_node_match(self):
-        pass
+    def test_deep(self):
+        related = MockCloudifyContext(
+            node_id='clodufiy_db_node_id_' + str(node_id.next()),
+            runtime_properties={
+                'chef_attributes': {
+                    'a': {
+                        'b': 7
+                    }
+                }
+            },
+        )
+        ctx = _make_context(operation='install', merge_chef_attributes={
+            'attr2': {
+                'attr2b': {
+                    'related_chef_attribute': 'a.b'
+                }
+            }
+
+        }, related=related)
+        # print("CTX", str(ctx), "RELATED", str(related))
+        v = chef_client._prepare_chef_attributes(ctx)
+        self.assertIn('attr2', v)
+        self.assertIn('attr2b', v['attr2'])
+        self.assertEquals(v['attr2']['attr2b'], 7)
 
 
 def _make_test(h):
