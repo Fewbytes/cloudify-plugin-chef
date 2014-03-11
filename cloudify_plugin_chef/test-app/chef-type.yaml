@@ -31,3 +31,11 @@ relationships:
                 - postconfigure: cloudify_plugin_chef.operations.operation
                 - establish:     cloudify_plugin_chef.operations.operation
                 - unlink:        cloudify_plugin_chef.operations.operation
+    cloudify.chef.connected_to:
+        derived_from: cloudify.relationships.connected_to
+        source_interfaces:
+            cloudify.interfaces.relationship_lifecycle:
+                - preconfigure:  cloudify_plugin_chef.operations.operation
+                - postconfigure: cloudify_plugin_chef.operations.operation
+                - establish:     cloudify_plugin_chef.operations.operation
+                - unlink:        cloudify_plugin_chef.operations.operation

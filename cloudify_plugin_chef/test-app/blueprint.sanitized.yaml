@@ -98,7 +98,7 @@ blueprint:
                         establish: recipe[create-file]
             relationships:
                 -
-                    type: cloudify.chef.depends_on
+                    type: cloudify.chef.connected_to
                     target: chef_node
                 -
                     type: cloudify.relationships.contained_in
