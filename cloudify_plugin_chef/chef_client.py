@@ -1,21 +1,22 @@
-#/*******************************************************************************
-# * Copyright (c) 2013 GigaSpaces Technologies Ltd. All rights reserved
-# *
-# * Licensed under the Apache License, Version 2.0 (the "License");
-# * you may not use this file except in compliance with the License.
-# * You may obtain a copy of the License at
-# *
-# *       http://www.apache.org/licenses/LICENSE-2.0
-# *
-# * Unless required by applicable law or agreed to in writing, software
-# * distributed under the License is distributed on an "AS IS" BASIS,
-#    * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#    * See the License for the specific language governing permissions and
-#    * limitations under the License.
-# *******************************************************************************/
+#******************************************************************************
+# Copyright (c) 2013 GigaSpaces Technologies Ltd. All rights reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+#  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  * See the License for the specific language governing permissions and
+#  * limitations under the License.
+#******************************************************************************
 
 """
-This module provides functions for installing, configuring and running chef-client against an existing chef-server or chef-solo.
+This module provides functions for installing, configuring and running
+chef-client against an existing chef-server or chef-solo.
 
 This module is specifically meant to be used for the cosmo celery tasks
 which import the `run_chef` function.
@@ -43,13 +44,14 @@ ENVS_MIN_VER_STR = '.'.join([str(x) for x in ENVS_MIN_VER])
 
 
 class SudoError(Exception):
-    """An internal exception for failures when running an os command with sudo"""
-    pass
+
+    """An internal exception for failures when running
+    an OS command with sudo"""
 
 
 class ChefError(Exception):
+
     """An exception for all chef related errors"""
-    pass
 
 
 class ChefManager(object):
@@ -57,13 +59,19 @@ class ChefManager(object):
     @classmethod
     def can_handle(cls, ctx):
         # All of the required args exist and are not None:
-        return all([ctx.properties['chef_config'].get(arg) is not None for arg in cls.REQUIRED_ARGS])
+        return all([
+                   ctx.properties['chef_config'].get(arg) is not None
+                   for arg in cls.REQUIRED_ARGS
+                   ])
 
     @classmethod
     def assert_args(cls, ctx):
-        missing_fields = (cls.REQUIRED_ARGS).union({'chef_version'}).difference(ctx.properties['chef_config'].keys())
+        missing_fields = (cls.REQUIRED_ARGS).union(
+            {'chef_version'}).difference(ctx.properties['chef_config'].keys())
         if missing_fields:
-            raise ChefError("The following required field(s) are missing: {0}".format(", ".join(missing_fields)))
+            raise ChefError(
+                "The following required field(s) "
+                "are missing: {0}".format(", ".join(missing_fields)))
 
     def get_version(self):
         """Check if chef-client is available and is of the right version"""
@@ -71,7 +79,9 @@ class ChefManager(object):
         if not self._prog_available_for_root(binary):
             return None
 
-        return self._extract_chef_version(subprocess.check_output(["/usr/bin/sudo", binary, "--version"]))
+        return self._extract_chef_version(
+            subprocess.check_output(["/usr/bin/sudo", binary, "--version"])
+        )
 
     def install(self, ctx):
         """If needed, install chef-client and point it to the server"""
@@ -79,27 +89,41 @@ class ChefManager(object):
         current_version = self.get_version()
         if current_version:
             if current_version == self._extract_chef_version(chef_version):
-                ctx.logger.info("Chef version {0} is already installed. Skipping installation.".format(chef_version))
+                ctx.logger.info(
+                    "Chef version {0} is already installed. "
+                    "Skipping installation.".format(chef_version))
                 return
             else:
                 # XXX: not tested
-                ctx.logger.info("Uninstalling Chef: requested version {0} does not match the installed version {1}".format(chef_version, current_version))
+                ctx.logger.info(
+                    "Uninstalling Chef: requested version {0} "
+                    "does not match the installed version {1}".format(
+                        chef_version, current_version))
                 self.uninstall(ctx)
 
         ctx.logger.info('Installing Chef [chef_version=%s]', chef_version)
-        chef_install_script = tempfile.NamedTemporaryFile(suffix="install.sh", delete=False)
+        chef_install_script = tempfile.NamedTemporaryFile(
+            suffix="install.sh", delete=False)
         chef_install_script.close()
         try:
             urllib.urlretrieve(CHEF_INSTALLER_URL, chef_install_script.name)
             os.chmod(chef_install_script.name, stat.S_IRWXU)
             self._sudo(ctx, chef_install_script.name, "-v", chef_version)
-            os.remove(chef_install_script.name)  # on failure, leave for debugging
+            os.remove(chef_install_script.name)
+                      # on failure, leave for debugging
         except Exception as exc:
             raise ChefError("Chef install failed on:\n%s" % exc)
 
-        ctx.logger.info('Setting up Chef [chef_server=\n%s]', ctx.properties['chef_config'].get('chef_server_url'))
+        ctx.logger.info('Setting up Chef [chef_server=\n%s]', ctx.properties[
+                        'chef_config'].get('chef_server_url'))
 
-        for directory in '/etc/chef', '/var/chef', '/var/log/chef', DATABAGS_DIR, ENVS_DIR, ROLES_DIR:
+        for directory in (
+                '/etc/chef',
+                '/var/chef',
+                '/var/log/chef',
+                DATABAGS_DIR,
+                ENVS_DIR,
+                ROLES_DIR):
             self._sudo(ctx, "mkdir", "-p", directory)
 
         self._install_files(ctx)
@@ -117,9 +141,12 @@ class ChefManager(object):
 
     def install_chef_handler(self, ctx):
         chef_root = self.get_chef_root(ctx)
-        handlers_source_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'chef', 'handler')
-        handlers_destination_path = os.path.join(os.path.join(chef_root), 'chef')
-        self._sudo(ctx, 'cp', '-r', handlers_source_path, handlers_destination_path)
+        handlers_source_path = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), 'chef', 'handler')
+        handlers_destination_path = os.path.join(
+            os.path.join(chef_root), 'chef')
+        self._sudo(
+            ctx, 'cp', '-r', handlers_source_path, handlers_destination_path)
 
     def get_chef_handler_config(self, ctx):
         s = (
@@ -131,14 +158,12 @@ class ChefManager(object):
         ).format(self.get_chef_root(ctx))
         return s
 
-
-
-
     def uninstall(self, ctx):
         """Uninstall chef-client - currently only supporting apt-get"""
-        #TODO: I didn't find a single method encouraged by opscode,
+        # TODO: I didn't find a single method encouraged by opscode,
         #      so we need to add manually for any supported platform
-        def apt_platform():  # assuming that if apt-get exists, it's how chef was installed
+        def apt_platform():
+            # Assuming that if apt-get exists, it's how chef was installed
             return self._prog_available_for_root('apt-get')
 
         if apt_platform():
@@ -148,7 +173,9 @@ class ChefManager(object):
             except SudoError as exc:
                 raise ChefError("chef-client uninstall failed on:\n%s" % exc)
         else:
-            ctx.logger.error("Chef uninstall is unimplemented for this platform, proceeding anyway")
+            ctx.logger.error(
+                "Chef uninstall is unimplemented for this platform, "
+                "proceeding anyway")
 
     def run(self, ctx, runlist, chef_attributes):
         self._prepare_for_run(ctx, runlist)
@@ -165,10 +192,12 @@ class ChefManager(object):
 
         try:
             self._sudo(ctx, *cmd)
-            os.remove(self.attribute_file.name)  # on failure, leave for debugging
+            os.remove(self.attribute_file.name)
+                      # on failure, leave for debugging
         except SudoError as exc:
             raise ChefError("The chef run failed\n"
-                            "runlist: {0}\nattributes: {1}\nexception: \n{2}".format(runlist, chef_attributes, exc))
+                            "runlist: {0}\nattributes: {1}\nexception: \n{2}".
+                            format(runlist, chef_attributes, exc))
 
     def _prepare_for_run(self, ctx, runlist):
         pass
@@ -180,11 +209,13 @@ class ChefManager(object):
         if match:
             return match.groups()[0]
         else:
-            raise ChefError("Failed to read chef version - '%s'" % version_string)
+            raise ChefError(
+                "Failed to read chef version - '%s'" % version_string)
 
     def _prog_available_for_root(self, prog):
         with open(os.devnull, "w") as fnull:
-            which_exitcode = subprocess.call(["/usr/bin/sudo", "which", prog], stdout=fnull, stderr=fnull)
+            which_exitcode = subprocess.call(
+                ["/usr/bin/sudo", "which", prog], stdout=fnull, stderr=fnull)
         return which_exitcode == 0
 
     def _log_text(self, ctx, title, prefix, text):
@@ -205,8 +236,9 @@ class ChefManager(object):
         cmd = ["/usr/bin/sudo"] + list(args)
         ctx.logger.info("Running: '%s'", ' '.join(cmd))
 
-        #TODO: Should we put the stdout/stderr in the celery logger? should we also keep output of successful runs?
-        #      per log level? Also see comment under run_chef()
+        # TODO: Should we put the stdout/stderr in the celery logger?
+        #       should we also keep output of successful runs?
+        #       per log level? Also see comment under run_chef()
         stdout = tempfile.TemporaryFile('rw+b')
         stderr = tempfile.TemporaryFile('rw+b')
         out = None
@@ -219,8 +251,9 @@ class ChefManager(object):
             self._log_text(ctx, "Chef stderr", "  [err] ", err)
         except subprocess.CalledProcessError as exc:
             raise SudoError("{exc}\nSTDOUT:\n{stdout}\nSTDERR:{stderr}".format(
-                exc=exc, stdout=get_file_contents(stdout), stderr=get_file_contents(stderr))
-            )
+                exc=exc,
+                stdout=get_file_contents(stdout),
+                stderr=get_file_contents(stderr)))
         finally:
             stdout.close()
             stderr.close()
@@ -240,18 +273,30 @@ class ChefClientManager(ChefManager):
     """ Installs Chef client """
 
     NAME = 'client'
-    REQUIRED_ARGS = {'chef_server_url', 'chef_validator_name', 'chef_validation', 'chef_environment'}
+    REQUIRED_ARGS = {'chef_server_url', 'chef_validator_name',
+                     'chef_validation', 'chef_environment'}
 
     def _get_cmd(self, ctx, runlist):
-        return ["chef-client", "-o", runlist, "-j", self.attribute_file.name, "--force-formatter"]
+        return [
+            "chef-client",
+            "-o",
+            runlist,
+            "-j",
+            self.attribute_file.name,
+            "--force-formatter"]
 
     def _get_binary(self):
         return 'chef-client'
 
     def _install_files(self, ctx):
         if ctx.properties['chef_config'].get('chef_validation'):
-            self._sudo_write_file(ctx, '/etc/chef/validation.pem', ctx.properties['chef_config']['chef_validation'])
-        self._sudo_write_file(ctx, '/etc/chef/client.rb',
+            self._sudo_write_file(
+                ctx,
+                '/etc/chef/validation.pem',
+                ctx.properties['chef_config']['chef_validation'])
+        self._sudo_write_file(
+            ctx,
+            '/etc/chef/client.rb',
             '# This file was generated by Cloudify Chef plugin\n'
             '# Also, Chef client was installed by Cloudify Chef plugin\n' +
             self.get_chef_handler_config(ctx) +
@@ -266,8 +311,8 @@ class ChefClientManager(ChefManager):
             'file_cache_path        "/var/chef/cache"\n'
             'file_backup_path       "/var/chef/backup"\n'
             'pid_file               "/var/run/chef/client.pid"\n'
-            'Chef::Log::Formatter.show_time = true\n'.format(**ctx.properties['chef_config'])
-        )
+            'Chef::Log::Formatter.show_time = true\n'.format(
+                **ctx.properties['chef_config']))
 
 
 class ChefSoloManager(ChefManager):
@@ -283,17 +328,30 @@ class ChefSoloManager(ChefManager):
         if url is None:
             return
 
-        ctx.logger.info("Downloading from {0} and unpacking to {1}".format(url, dst_dir))
-        temp_archive = tempfile.NamedTemporaryFile(suffix='.url_to_dir.tar.gz', delete=False)
+        ctx.logger.info(
+            "Downloading from {0} and unpacking to {1}".format(url, dst_dir))
+        temp_archive = tempfile.NamedTemporaryFile(
+            suffix='.url_to_dir.tar.gz', delete=False)
         temp_archive.write(requests.get(url).content)
         temp_archive.flush()
         temp_archive.close()
-        command_list = ['tar', '-C', dst_dir, '--xform', 's#^' + os.path.basename(dst_dir) + '/##', '-xzf', temp_archive.name]
+        command_list = [
+            'tar', '-C', dst_dir,
+            '--xform', 's#^' + os.path.basename(dst_dir) + '/##',
+            '-xzf', temp_archive.name]
         try:
             ctx.logger.info("Running: '%s'", ' '.join(command_list))
             subprocess.check_call(command_list)
         except subprocess.CalledProcessError as exc:
-            raise ChefError("Failed to extract file {0} to directory {1} which was downloaded from {2}. Command: {3} Exception: {4}".format(temp_archive.name, dst_dir, url, command_list, exc))
+            raise ChefError("Failed to extract file {0} to directory {1} "
+                            "which was downloaded from {2}. Command: {3}. "
+                            "Exception: {4}".format(
+                                temp_archive.name,
+                                dst_dir,
+                                url,
+                                command_list,
+                                exc))
+
         os.remove(temp_archive.name)  # on failure, leave for debugging
         try:
             os.rmdir(os.path.join(dst_dir, os.path.basename(dst_dir)))
@@ -302,16 +360,22 @@ class ChefSoloManager(ChefManager):
                 raise e
 
     def _prepare_for_run(self, ctx, runlist):
-        for dl in ('chef_environments', ENVS_DIR), ('chef_databags', DATABAGS_DIR), ('chef_roles', ROLES_DIR):
-            self._url_to_dir(ctx, ctx.properties['chef_config'].get(dl[0]), dl[1])
+        for dl in (
+                ('chef_environments', ENVS_DIR),
+                ('chef_databags', DATABAGS_DIR),
+                ('chef_roles', ROLES_DIR)):
+            self._url_to_dir(
+                ctx, ctx.properties['chef_config'].get(dl[0]), dl[1])
 
     def _get_cmd(self, ctx, runlist):
         cmd = ["chef-solo"]
 
-        if ctx.properties['chef_config'].get('chef_environment', '_default') != '_default':
+        if (ctx.properties['chef_config'].get('chef_environment', '_default')
+                != '_default'):
             v = self.get_version()
             if [int(x) for x in v.split('.')] < ENVS_MIN_VER:
-                raise ChefError("Chef solo environments are supported starting at {0} but you are using {1}".
+                raise ChefError("Chef solo environments are supported "
+                                "starting at {0} but you are using {1}".
                                 format(ENVS_MIN_VER_STR, v))
             cmd += ["-E", ctx.properties['chef_config']['chef_environment']]
         cmd += [
@@ -327,21 +391,28 @@ class ChefSoloManager(ChefManager):
 
     def _install_files(self, ctx):
         # Do not put 'environment' in this file.
-        # It causes chef solo to act as client (than fails when certificate is missing)
+        # It causes chef solo to act as client (than fails when certificate is
+        # missing)
         self._sudo_write_file(ctx, '/etc/chef/solo.rb',
-            self.get_chef_handler_config(ctx) +
-            'log_location       "/var/log/chef/solo.log"')
+                              self.get_chef_handler_config(ctx) +
+                              'log_location       "/var/log/chef/solo.log"')
 
 
 def get_manager(ctx):
     managers = ChefClientManager, ChefSoloManager
     for cls in managers:
         if cls.can_handle(ctx):
-            ctx.logger.info("Chef manager class to be used: {0}".format(cls.__name__))
+            ctx.logger.info(
+                "Chef manager class to be used: {0}".format(cls.__name__))
             cls.assert_args(ctx)
             return cls()
-    arguments_sets = '; '.join(['(for ' + m.NAME + '): ' + ', '.join(list(m.REQUIRED_ARGS)) for m in managers])
-    raise ChefError("Failed to find appropriate Chef manager for the specified arguments ({0}). Possible arguments sets are: {1}".format(ctx.properties['chef_config'], arguments_sets))
+    arguments_sets = '; '.join(
+        ['(for ' + m.NAME + '): ' + ', '.join(
+            list(m.REQUIRED_ARGS)) for m in managers])
+    raise ChefError("Failed to find appropriate Chef manager "
+                    "for the specified arguments ({0}). "
+                    "Possible arguments sets are: {1}"
+                    .format(ctx.properties['chef_config'], arguments_sets))
 
 
 def _context_to_struct(ctx):
@@ -350,6 +421,7 @@ def _context_to_struct(ctx):
         'runtime_properties': ctx.runtime_properties,
         'capabilities': ctx.capabilities.get_all(),
     }
+
 
 def _process_rel_runtime_props(ctx, data):
     ctx.logger.debug("_process_rel_runtime_props: ctx={0} related={1} data={1}"
@@ -361,7 +433,8 @@ def _process_rel_runtime_props(ctx, data):
         path = None
         if isinstance(v, dict):
             if 'related_chef_attribute' in v:
-                path = ['chef_attributes'] + v['related_chef_attribute'].split('.')
+                path = ['chef_attributes'] + v[
+                    'related_chef_attribute'].split('.')
 
             if 'related_runtime_property' in v:
                 path = v['related_runtime_property'].split('.')
@@ -411,11 +484,13 @@ def _prepare_chef_attributes(ctx):
     chef_attributes['cloudify'] = _context_to_struct(ctx)
 
     if ctx.related:
-        chef_attributes['cloudify']['related'] = _context_to_struct(ctx.related)
+        chef_attributes['cloudify'][
+            'related'] = _context_to_struct(ctx.related)
 
     chef_attributes = _process_rel_runtime_props(ctx, chef_attributes)
 
     return chef_attributes
+
 
 def run_chef(ctx, runlist):
     """Run given runlist using Chef.
@@ -429,10 +504,12 @@ def run_chef(ctx, runlist):
 
     t = 'cloudify_chef_attrs_out.{0}.{1}.{2}.'.format(
         ctx.node_name, ctx.node_id, os.getpid())
-    attrs_tmp_file = tempfile.NamedTemporaryFile(prefix=t, suffix='.json', delete=False)
+    attrs_tmp_file = tempfile.NamedTemporaryFile(
+        prefix=t, suffix='.json', delete=False)
     chef_attributes['cloudify']['attributes_output_file'] = attrs_tmp_file.name
 
-    ctx.logger.debug("Using attributes_output_file: {0}".format(attrs_tmp_file.name))
+    ctx.logger.debug(
+        "Using attributes_output_file: {0}".format(attrs_tmp_file.name))
     chef_manager = get_manager(ctx)
     chef_manager.install(ctx)
     chef_manager.run(ctx, runlist, chef_attributes)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import copy
-from functools import wraps
 import itertools
 import os
 import random
@@ -26,23 +25,28 @@ CHEF_CREATED_FILE_NAME = '/tmp/cloudify_plugin_chef_test.txt'
 CHEF_CREATED_FILE_CONTENTS = ''.join([random.choice(
     string.ascii_uppercase + string.digits) for x in range(6)])
 
+
 class TestsConfig(cpc.Config):
     which = 'chef_tests'
 
 os.environ.setdefault('CHEF_TESTS_CONFIG_PATH',
-    os.path.join(os.path.dirname(os.path.realpath(__file__)), 'chef_tests.json'))
+                      os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                   'chef_tests.json'))
 
 tests_config = TestsConfig().get()
 
 node_id = itertools.count(100)
 
 
-def _make_context(installation_type='solo', operation=None, merge_chef_attributes=None, related=None):
+def _make_context(installation_type='solo', operation=None,
+                  merge_chef_attributes=None, related=None):
     props = copy.deepcopy(tests_config[installation_type]['properties'])
     props.setdefault('chef_attributes', {})
     props['chef_attributes'].setdefault('create_file', {})
-    props['chef_attributes']['create_file'].setdefault('file_name', CHEF_CREATED_FILE_NAME)
-    props['chef_attributes']['create_file'].setdefault('file_contents', CHEF_CREATED_FILE_CONTENTS)
+    props['chef_attributes']['create_file'].setdefault(
+        'file_name', CHEF_CREATED_FILE_NAME)
+    props['chef_attributes']['create_file'].setdefault(
+        'file_contents', CHEF_CREATED_FILE_CONTENTS)
     props['chef_attributes'].update(merge_chef_attributes or {})
     ctx = MockCloudifyContext(
         node_id='clodufiy_app_node_id_' + str(node_id.next()),
@@ -53,10 +57,12 @@ def _make_context(installation_type='solo', operation=None, merge_chef_attribute
     )
     return ctx
 
+
 class ChefPluginTest(object):
 
     def _make_context(self, operation=None, merge_chef_attributes=None):
-        return _make_context(self.__class__.INSTALLATION_TYPE, operation, merge_chef_attributes)
+        return _make_context(self.__class__.INSTALLATION_TYPE, operation,
+                             merge_chef_attributes)
 
 
 class ChefPluginWithHTTPServer(ChefPluginTest):
@@ -87,11 +93,13 @@ class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
         # Assumption: chef-client version is the same
         ctx = self._make_context()
         chef_manager = chef_client.get_manager(ctx)
-        self.assertIsInstance(chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
+        self.assertIsInstance(
+            chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
         chef_manager.install(ctx)
         output = subprocess.check_output(['sudo', 'chef-client', '-v'])
         m = re.match('^Chef: ([0-9.]+)', output)
-        expected_version, _, _ = tests_config['solo']['properties']['chef_version'].partition('-')
+        expected_version, _, _ = tests_config['solo'][
+            'properties']['chef_version'].partition('-')
         self.assertEquals(m.group(1), expected_version)
 
         # TEMP!!!
@@ -100,10 +108,12 @@ class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')
         chef_operations.operation(ctx)
-        create_file_attrs = ctx.properties['chef_config']['chef_attributes']['create_file']
+        create_file_attrs = ctx.properties[
+            'chef_config']['chef_attributes']['create_file']
         f = create_file_attrs['file_name']
         c = create_file_attrs['file_contents']
         self.assertEquals(open(f).read(), c)
+
 
 class ChefPluginAttrubutesPassingTestBase(object):
 
@@ -111,14 +121,16 @@ class ChefPluginAttrubutesPassingTestBase(object):
     TODO: Depth tests, as opposed to only shallow tests now.
     """
 
-    def _run(self, a1key, has_default, has_rel, has_prop_key, has_chef_attr_key, expect_exception=None):
+    def _run(self, a1key, has_default, has_rel, has_prop_key,
+             has_chef_attr_key, expect_exception=None):
         merge_chef_attributes = {
             'attr1': {
             }
         }
         merge_chef_attributes['attr1'][a1key] = 'prop1'
         if has_default:
-            merge_chef_attributes['attr1']['default_value'] = 'attr1_default_val'
+            merge_chef_attributes['attr1'][
+                'default_value'] = 'attr1_default_val'
         if has_rel:
             runtime_properties = {}
             if has_prop_key:
@@ -134,10 +146,13 @@ class ChefPluginAttrubutesPassingTestBase(object):
         else:
             related = None
         # print("MERGE_CHEF_ATTRIBUTES", merge_chef_attributes)
-        ctx = _make_context(operation='install', merge_chef_attributes=merge_chef_attributes, related=related)
+        ctx = _make_context(
+            operation='install', merge_chef_attributes=merge_chef_attributes,
+            related=related)
         # print("CTX", str(ctx), "RELATED", str(related))
         if expect_exception:
-            self.assertRaises(expect_exception, chef_client._prepare_chef_attributes, ctx)
+            self.assertRaises(
+                expect_exception, chef_client._prepare_chef_attributes, ctx)
         else:
             return chef_client._prepare_chef_attributes(ctx)
 
@@ -181,12 +196,14 @@ def _make_test(h):
     test_method.__name__ = 'test_' + '_'.join(map(str, h[:-1]))
     return test_method
 
+
 def _make_value_confirmer(expected_value):
     def f(self, v, msg):
         self.assertIn('attr1', v)
         self.assertEquals(v['attr1'], expected_value)
     f.__name__ = 'value_confirmer_{0}'.format(expected_value)
     return f
+
 
 def _confirm_no_attr(self, v, msg):
     self.assertNotIn('attr1', v, msg)
@@ -195,47 +212,69 @@ _confirm_default_val = _make_value_confirmer('attr1_default_val')
 _confirm_prop_val = _make_value_confirmer('prop_val')
 _confirm_chef_attr_val = _make_value_confirmer('chef_attr_val')
 
-# args: a1key, has_default, has_rel, has_prop_key, has_chef_attr_key, confirmator_or_excpetion
+# args:
+#       a1key, has_default, has_rel, has_prop_key,
+#       has_chef_attr_key, confirmator_or_excpetion
 # Commented out tests without related node except for the first four of them.
 # They are not interesting.
 b = ChefPluginAttrubutesPassingTestBase
 how = (
-    ('related_runtime_property',  False,  False,  False,  False,  _confirm_no_attr),
-    ('related_chef_attribute',    False,  False,  False,  False,  _confirm_no_attr),
-    ('related_runtime_property',  True,   False,  False,  False,  _confirm_default_val),
-    ('related_chef_attribute',    True,   False,  False,  False,  _confirm_default_val),
+    ('related_runtime_property',  False,
+     False,  False,  False,  _confirm_no_attr),
+    ('related_chef_attribute',    False,
+     False,  False,  False,  _confirm_no_attr),
+    ('related_runtime_property',  True,   False,
+     False,  False,  _confirm_default_val),
+    ('related_chef_attribute',    True,   False,
+     False,  False,  _confirm_default_val),
     ('related_runtime_property',  False,  True,   False,  False,  KeyError),
     ('related_chef_attribute',    False,  True,   False,  False,  KeyError),
-    ('related_runtime_property',  True,   True,   False,  False,  _confirm_default_val),
-    ('related_chef_attribute',    True,   True,   False,  False,  _confirm_default_val),
-    # ('related_runtime_property',  False,  False,  True,   False,  _confirm_no_attr),
-    # ('related_chef_attribute',    False,  False,  True,   False,  _confirm_no_attr),
-    # ('related_runtime_property',  True,   False,  True,   False,  _confirm_default_val),
-    # ('related_chef_attribute',    True,   False,  True,   False,  _confirm_default_val),
-    ('related_runtime_property',  False,  True,   True,   False,  _confirm_prop_val),
+    ('related_runtime_property',  True,   True,
+     False,  False,  _confirm_default_val),
+    ('related_chef_attribute',    True,   True,
+     False,  False,  _confirm_default_val),
+    #('related_runtime_property',False,False,True,False,_confirm_no_attr),
+    #('related_chef_attribute',False,False,True,False,_confirm_no_attr),
+    #('related_runtime_property',True,False,True,False,_confirm_default_val),
+    #('related_chef_attribute',True,False,True,False,_confirm_default_val),
+    ('related_runtime_property',  False,
+     True,   True,   False,  _confirm_prop_val),
     ('related_chef_attribute',    False,  True,   True,   False,  KeyError),
-    ('related_runtime_property',  True,   True,   True,   False,  _confirm_prop_val),
-    ('related_chef_attribute',    True,   True,   True,   False,  _confirm_default_val),
-    # ('related_runtime_property',  False,  False,  False,  True,   _confirm_no_attr),
-    # ('related_chef_attribute',    False,  False,  False,  True,   _confirm_no_attr),
-    # ('related_runtime_property',  True,   False,  False,  True,   _confirm_default_val),
-    # ('related_chef_attribute',    True,   False,  False,  True,   _confirm_default_val),
+    ('related_runtime_property',  True,   True,
+     True,   False,  _confirm_prop_val),
+    ('related_chef_attribute',    True,   True,
+     True,   False,  _confirm_default_val),
+    #('related_runtime_property',False,False,False,True,_confirm_no_attr),
+    #('related_chef_attribute',False,False,False,True,_confirm_no_attr),
+    #('related_runtime_property',True,False,False,True,_confirm_default_val),
+    #('related_chef_attribute',True,False,False,True,_confirm_default_val),
     ('related_runtime_property',  False,  True,   False,  True,   KeyError),
-    ('related_chef_attribute',    False,  True,   False,  True,   _confirm_chef_attr_val),
-    ('related_runtime_property',  True,   True,   False,  True,   _confirm_default_val),
-    ('related_chef_attribute',    True,   True,   False,  True,   _confirm_chef_attr_val),
-    # ('related_runtime_property',  False,  False,  True,   True,   _confirm_no_attr),
-    # ('related_chef_attribute',    False,  False,  True,   True,   _confirm_no_attr),
-    # ('related_runtime_property',  True,   False,  True,   True,   _confirm_default_val),
-    # ('related_chef_attribute',    True,   False,  True,   True,   _confirm_default_val),
-    ('related_runtime_property',  False,  True,   True,   True,   _confirm_prop_val),
-    ('related_chef_attribute',    False,  True,   True,   True,   _confirm_chef_attr_val),
-    ('related_runtime_property',  True,   True,   True,   True,   _confirm_prop_val),
-    ('related_chef_attribute',    True,   True,   True,   True,   _confirm_chef_attr_val),
+    ('related_chef_attribute',    False,  True,
+     False,  True,   _confirm_chef_attr_val),
+    ('related_runtime_property',  True,   True,
+     False,  True,   _confirm_default_val),
+    ('related_chef_attribute',    True,   True,
+     False,  True,   _confirm_chef_attr_val),
+    #('related_runtime_property',False,False,True,True,_confirm_no_attr),
+    #('related_chef_attribute',False,False,True,True,_confirm_no_attr),
+    #('related_runtime_property',True,False,True,True,_confirm_default_val),
+    #('related_chef_attribute',True,False,True,True,_confirm_default_val),
+    ('related_runtime_property',  False,
+     True,   True,   True,   _confirm_prop_val),
+    ('related_chef_attribute',    False,  True,
+     True,   True,   _confirm_chef_attr_val),
+    ('related_runtime_property',  True,
+     True,   True,   True,   _confirm_prop_val),
+    ('related_chef_attribute',    True,   True,
+     True,   True,   _confirm_chef_attr_val),
 )
 
 methods = {m.__name__: m for m in map(_make_test, how)}
-ChefPluginAttrubutesPassingTest = type('ChefPluginAttrubutesPassingTest', (ChefPluginTest, unittest.TestCase, b), methods)
+ChefPluginAttrubutesPassingTest = type(
+    'ChefPluginAttrubutesPassingTest',
+    (ChefPluginTest, unittest.TestCase, b),
+    methods)
+
 
 class ChefPluginSoloTest(ChefPluginInstallationTest, unittest.TestCase):
 
@@ -252,14 +291,17 @@ class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
         super(ChefPluginClientTest, self).test_chef_installation()
         ctx = self._make_context()
         chef_manager = chef_client.get_manager(ctx)
-        self.assertIsInstance(chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
+        self.assertIsInstance(
+            chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
         try:
-            chef_manager.run(ctx, '', ctx.properties['chef_config']['chef_attributes'])
+            chef_manager.run(
+                ctx, '', ctx.properties['chef_config']['chef_attributes'])
         except chef_client.ChefError:
             self.fail("Chef run failed")
 
 
-class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer, unittest.TestCase):
+class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer,
+                                      unittest.TestCase):
 
     def test_attributes_capture(self):
         ctx = _make_context(operation='install')

@@ -4,14 +4,15 @@ from cloudify_plugin_chef.chef_client import run_chef
 
 EXPECTED_OP_PREFIX = 'cloudify.interfaces.lifecycle'
 
+
 def _extract_op(ctx):
     prefix, _, op = ctx.operation.rpartition('.')
     if prefix != EXPECTED_OP_PREFIX:
         ctx.warn("Node operation is expected to start with '{0}' "
-            "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefx))
+                 "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefix))
     return op
 
-# Remember: attributes
+
 @_operation
 def operation(ctx, **kwargs):
 
