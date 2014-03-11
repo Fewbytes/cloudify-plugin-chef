@@ -49,7 +49,7 @@ blueprint:
         #                 grep -q novalocal /etc/hosts || echo "10.20.30.40 chef.novalocal" >> /etc/hosts
         -
             name: chef_node
-            type: middleware_server_chef
+            type: db_server_chef
             properties:
                 chef_config:
                     chef_version: "11.10.4-1"
@@ -79,7 +79,7 @@ blueprint:
         # Just to show attributes passing chef_node -> chef_node2
         -
             name: chef_node2
-            type: middleware_server_chef
+            type: app_server_chef
             properties:
                 chef_config:
                     chef_version: "11.10.4-1"
