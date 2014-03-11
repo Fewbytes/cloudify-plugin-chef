@@ -352,7 +352,8 @@ def _context_to_struct(ctx):
     }
 
 def _process_rel_runtime_props(ctx, data):
-    # ctx.logger.debug("_process_rel_runtime_props: data={0}".format(data))
+    ctx.logger.debug("_process_rel_runtime_props: ctx={0} related={1} data={1}"
+                     .format(ctx, ctx.related, data))
     if not isinstance(data, dict):
         return data
     ret = {}
