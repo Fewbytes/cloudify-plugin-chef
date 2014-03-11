@@ -427,6 +427,9 @@ def _context_to_struct(ctx):
 
 
 def _process_rel_runtime_props(ctx, data):
+    ctx.logger.debug("_process_rel_runtime_props: "
+                     "ctx.related.runtime_properties={0}"
+                     .format(ctx.related.runtime_properties))
     ctx.logger.debug("_process_rel_runtime_props: ctx={0} related={1} data={1}"
                      .format(ctx, ctx.related, data))
     if not isinstance(data, dict):
@@ -450,6 +453,7 @@ def _process_rel_runtime_props(ctx, data):
                 continue
 
             ptr = ctx.related.runtime_properties
+            orig_path = path[:]
             try:
                 while path:
                     # print("K={} V={} PATH={} PTR={}".format(k, v, path, ptr))
@@ -460,7 +464,7 @@ def _process_rel_runtime_props(ctx, data):
                     continue
                 else:
                     raise KeyError("Runtime propery {0} not found in related "
-                                   "node {1}".format(path, ctx.related))
+                                   "node {1}".format(orig_path, ctx.related))
             ret[k] = ptr
         else:
             ret[k] = _process_rel_runtime_props(ctx, v)

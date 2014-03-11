@@ -2,14 +2,17 @@ from cloudify.decorators import operation as _operation
 
 from cloudify_plugin_chef.chef_client import run_chef
 
-EXPECTED_OP_PREFIX = 'cloudify.interfaces.lifecycle'
+EXPECTED_OP_PREFIXES = (
+    'cloudify.interfaces.lifecycle',
+    'cloudify.interfaces.relationship_lifecycle')
 
 
 def _extract_op(ctx):
     prefix, _, op = ctx.operation.rpartition('.')
-    if prefix != EXPECTED_OP_PREFIX:
+    if prefix not in EXPECTED_OP_PREFIXES:
         ctx.logger.warn("Node operation is expected to start with '{0}' "
-                 "but starts with '{1}'".format(EXPECTED_OP_PREFIX, prefix))
+                        "but starts with '{1}'".format(
+                            ' or '.join(EXPECTED_OP_PREFIXES), prefix))
     return op
 
 
