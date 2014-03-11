@@ -311,5 +311,10 @@ class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer,
             self.assertIn(a, ctx.runtime_properties['chef_attributes'])
 
 
+class ContextTostructTest(ChefPluginTest, unittest.testcase):
+
+    """ TODO """
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -416,11 +416,14 @@ def get_manager(ctx):
 
 
 def _context_to_struct(ctx):
-    return {
+    ret = {
         'node_id': ctx.node_id,
         'runtime_properties': ctx.runtime_properties,
-        'capabilities': ctx.capabilities.get_all(),
+        'capabilities': {},
     }
+    if hasattr(ctx, 'capabilities'):
+        ret['capabilities'] = ctx.capabilities.get_all()
+    return ret
 
 
 def _process_rel_runtime_props(ctx, data):
