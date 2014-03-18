@@ -1,3 +1,4 @@
 *.iml
 *.tar.gz
 chef_tests.json
+cloudify_plugin_chef/test-app/plugins/*

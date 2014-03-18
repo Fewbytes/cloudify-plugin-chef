@@ -7,6 +7,7 @@ import random
 import re
 import string
 import subprocess
+import tempfile
 import unittest
 
 
@@ -49,11 +50,15 @@ def _make_context(installation_type='solo', operation=None,
         'file_contents', CHEF_CREATED_FILE_CONTENTS)
     props['chef_attributes'].update(merge_chef_attributes or {})
     ctx = MockCloudifyContext(
-        node_id='clodufiy_app_node_id_' + str(node_id.next()),
+        node_id='clodufiy_app_node_id_{0}_{1}'.format(
+            node_id.next(), os.getpid()),
         operation='cloudify.interfaces.lifecycle.' +
         (operation or 'INVALID'),
         properties={'chef_config': props},
-        related=related
+        related=related,
+        resources={
+            '/cookbooks.tar.gz': open('cookbooks.tar.gz', 'r').read(),
+        },
     )
     return ctx
 
@@ -95,15 +100,12 @@ class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
         chef_manager = chef_client.get_manager(ctx)
         self.assertIsInstance(
             chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
-        chef_manager.install(ctx)
+        chef_manager.install()
         output = subprocess.check_output(['sudo', 'chef-client', '-v'])
         m = re.match('^Chef: ([0-9.]+)', output)
         expected_version, _, _ = tests_config['solo'][
             'properties']['chef_version'].partition('-')
         self.assertEquals(m.group(1), expected_version)
-
-        # TEMP!!!
-        chef_manager.install_chef_handler(ctx)
 
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')
@@ -295,7 +297,7 @@ class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
             chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
         try:
             chef_manager.run(
-                ctx, '', ctx.properties['chef_config']['chef_attributes'])
+                '', ctx.properties['chef_config']['chef_attributes'])
         except chef_client.ChefError:
             self.fail("Chef run failed")
 
@@ -311,9 +313,39 @@ class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer,
             self.assertIn(a, ctx.runtime_properties['chef_attributes'])
 
 
-class ContextTostructTest(ChefPluginTest, unittest.testcase):
+class ContextTostructTest(ChefPluginTest, unittest.TestCase):
 
     """ TODO """
+
+
+class LockTest(ChefPluginTest, unittest.TestCase):
+
+    INSTALLATION_TYPE = 'solo'
+
+    def setUp(self):
+        super(LockTest, self).setUp()
+        self.path = None
+
+    def tearDown(self):
+        super(LockTest, self).tearDown()
+        if self.path:
+            os.remove(self.path)
+
+    def test_clean(self):
+        ctx = self._make_context()
+        _, path = tempfile.mkstemp(prefix='cloudify_lock_test.')
+        self.path = path
+        ok = False
+        try:
+            with chef_client.RetryingLock(ctx, path, 3, 0.5):
+                try:
+                    with chef_client.RetryingLock(ctx, path, 3, 0.5):
+                        pass
+                except RuntimeError:
+                    ok = True
+        except RuntimeError:
+            self.fail("Outer lock failed")
+        self.assertTrue(ok, "Inner lock have not failed")
 
 
 if __name__ == '__main__':
