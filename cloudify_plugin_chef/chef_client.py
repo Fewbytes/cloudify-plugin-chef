@@ -37,7 +37,6 @@ import tempfile
 import time
 import subprocess
 import json
-import errno
 
 CHEF_INSTALLER_URL = "https://www.opscode.com/chef/install.sh"
 SOLO_COOKBOOKS_FILE = "cookbooks.tar.gz"
@@ -92,7 +91,7 @@ class RetryingLock(object):
                 flock(self.file, LOCK_EX | LOCK_NB)
             except IOError:
                 self.ctx.logger.info("Could not lock the file '{0}'."
-                                     "Will sleep for {0} seconds and then try "
+                                     "Will sleep for {1} seconds and then try "
                                      "again.".format(self.path, self.sleep))
                 time.sleep(self.sleep)
             else:
@@ -218,6 +217,7 @@ class ChefManager(object):
     def install_files(self):
         dirs = map(self.get_path, self.DIRS.values() + ['etc', 'log'])
         self._sudo("mkdir", "-p", *dirs)
+        self._sudo("chmod", "700", self.get_chef_data_root())
         self.install_chef_handler()
 
     def install_chef_handler(self):
@@ -259,9 +259,6 @@ class ChefManager(object):
         """Uninstall chef-client - currently only supporting apt-get"""
         # TODO: I didn't find a single method encouraged by opscode,
         #      so we need to add manually for any supported platform
-
-        # TODO: really uninstall only when it's the last node on the server
-        return
 
         ctx = self.ctx
 
@@ -446,7 +443,7 @@ def is_resource_url(url):
     '/xyz.tar.gz' URLs are pointing to resources.
     """
     u = urlparse.urlparse(url)
-    return bool(u.scheme), u.path
+    return (not u.scheme), u.path
 
 
 class ChefSoloManager(ChefManager):
@@ -507,11 +504,11 @@ class ChefSoloManager(ChefManager):
                                 exc))
 
         os.remove(temp_archive.name)  # on failure, leave for debugging
-        try:
-            os.rmdir(os.path.join(dst_dir, os.path.basename(dst_dir)))
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise e
+        # try:
+        #     os.rmdir(os.path.join(dst_dir, os.path.basename(dst_dir)))
+        # except OSError as e:
+        #     if e.errno != errno.ENOENT:
+        #         raise e
 
     def _prepare_for_run(self, runlist):
         ctx = self.ctx
@@ -522,15 +519,17 @@ class ChefSoloManager(ChefManager):
                    ('chef_roles', 'roles')]:
             self._url_to_dir(cc.get(dl[0]), self.get_path(dl[1]))
         is_resource, path = is_resource_url(cc['chef_cookbooks'])
-        if is_resource_url:
+        if is_resource:
             ctx.logger.info("Getting Chef cookbooks resource {0} to {1}"
                             .format(path, file_name))
-            data = ctx.get_resource(path)
+            resource_local_file = ctx.get_resource(path)
+            self._sudo("cp", resource_local_file, file_name)
+            os.remove(resource_local_file)
         else:
             ctx.logger.info("Downloading Chef cookbooks from {0} to {1}"
                             .format(cc['chef_cookbooks'], file_name))
             data = requests.get(cc['chef_cookbooks']).content
-        self._sudo_write_file(file_name, data)
+            self._sudo_write_file(file_name, data)
 
     def _get_cmd(self, runlist):
         ctx = self.ctx
@@ -540,7 +539,7 @@ class ChefSoloManager(ChefManager):
         if (ctx.properties['chef_config'].get('chef_environment', '_default')
                 != '_default'):
             v = self.get_version()
-            if [int(x) for x in v.split('.')] < ENVS_MIN_VER:
+            if map(int, v.split('.')) < ENVS_MIN_VER:
                 raise ChefError("Chef solo environments are supported "
                                 "starting at {0} but you are using {1}".
                                 format(ENVS_MIN_VER_STR, v))
@@ -602,12 +601,6 @@ def _context_to_struct(ctx):
 
 
 def _process_rel_runtime_props(ctx, data):
-    if ctx.related:
-        ctx.logger.info("_process_rel_runtime_props: "
-                        "ctx.related.runtime_properties={0}"
-                        .format(ctx.related.runtime_properties))
-    # ctx.logger.info("_process_rel_runtime_props: ctx={0} related={1} data={1}"
-    #                 .format(ctx, ctx.related, data))
     if not isinstance(data, dict):
         return data
     ret = {}

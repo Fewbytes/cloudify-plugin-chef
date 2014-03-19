@@ -57,7 +57,7 @@ def _make_context(installation_type='solo', operation=None,
         properties={'chef_config': props},
         related=related,
         resources={
-            '/cookbooks.tar.gz': open('cookbooks.tar.gz', 'r').read(),
+            '/cookbooks.tar.gz': os.path.abspath('cookbooks.tar.gz'),  # XXX: untested change
         },
     )
     return ctx

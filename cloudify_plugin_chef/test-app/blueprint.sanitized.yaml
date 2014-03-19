@@ -48,7 +48,7 @@ blueprint:
         #                 #!/bin/bash -ex
         #                 grep -q novalocal /etc/hosts || echo "10.20.30.40 chef.novalocal" >> /etc/hosts
         -
-            name: chef_node
+            name: chef_node_one
             type: db_server_chef
             properties:
                 chef_config:
@@ -76,9 +76,9 @@ blueprint:
                     type: cloudify.relationships.contained_in
                     target: existing_server
                     # target: server
-        # Just to show attributes passing chef_node -> chef_node2
+        # Just to show attributes passing chef_node -> chef_node_two
         -
-            name: chef_node2
+            name: chef_node_two
             type: app_server_chef
             properties:
                 chef_config:
@@ -87,7 +87,7 @@ blueprint:
                     # ALT 2: solo
                     chef_cookbooks: http://1.2.3.4:50000/cookbooks.tar.gz
 
-                    chef_environment: "_default"
+                    chef_environment: _default
                     chef_attributes:
                         other_file_name: {related_chef_attribute: create_file.file_name}
                         test_attr_2: test_val_2
@@ -99,7 +99,43 @@ blueprint:
             relationships:
                 -
                     type: cloudify.chef.connected_to
-                    target: chef_node
+                    target: chef_node_one
+                -
+                    type: cloudify.relationships.contained_in
+                    target: existing_server
+
+        -
+            # Concurrent installation with chef_node_one
+            name: chef_node_env_e1
+            type: app_server_chef
+            properties:
+                chef_config:
+                    chef_version: 11.10.4-1
+                    chef_cookbooks: plugins/cloudify-plugin-chef/cloudify_plugin_chef/chef/cookbooks.tar.gz
+                    chef_environments: plugins/cloudify-plugin-chef/cloudify_plugin_chef/chef/environments.tar.gz
+                    chef_environment: e1
+                    chef_attributes:
+                        create_file:
+                            file_name: /tmp/chef_node_env.e1.txt
+                    runlists:
+                        create: recipe[create-file]
+            relationships:
+                -
+                    type: cloudify.relationships.contained_in
+                    target: existing_server
+
+        -
+            # Concurrent installation with chef_node_one
+            name: chef_node_role_r1
+            type: app_server_chef
+            properties:
+                chef_config:
+                    chef_version: 11.10.4-1
+                    chef_cookbooks: plugins/cloudify-plugin-chef/cloudify_plugin_chef/chef/cookbooks.tar.gz
+                    chef_roles: plugins/cloudify-plugin-chef/cloudify_plugin_chef/chef/roles.tar.gz
+                    runlists:
+                        create: role[r1]
+            relationships:
                 -
                     type: cloudify.relationships.contained_in
                     target: existing_server
