@@ -139,7 +139,7 @@ class ChefManager(object):
     @classmethod
     def assert_args(cls, ctx):
         missing_fields = (cls.REQUIRED_ARGS).union(
-            {'chef_version'}).difference(ctx.properties['chef_config'].keys())
+            {'version'}).difference(ctx.properties['chef_config'].keys())
         if missing_fields:
             raise ChefError(
                 "The following required field(s) "
@@ -165,10 +165,7 @@ class ChefManager(object):
         """ Get Chef's node_name for this YAML node """
         node_id = re.sub(r'[^a-zA-Z0-9-]', "-", str(self.ctx.node_id))
         cc = self.ctx.properties['chef_config']
-        return (
-            cc['chef_node_name_prefix'] +
-            node_id +
-            cc['chef_node_name_suffix'])
+        return cc['node_name_prefix'] + node_id + cc['node_name_suffix']
 
     def get_path(self, *p):
         """ Get absolute path to a file under Chef root """
@@ -177,7 +174,7 @@ class ChefManager(object):
     def install(self):
         """If needed, install chef-client and point it to the server"""
         ctx = self.ctx
-        chef_version = ctx.properties['chef_config']['chef_version']
+        chef_version = ctx.properties['chef_config']['version']
 
         with RetryingLock(ctx, *CHEF_INSTALL_LOCK):
 
@@ -378,8 +375,8 @@ class ChefClientManager(ChefManager):
     """ Installs Chef client """
 
     NAME = 'client'
-    REQUIRED_ARGS = {'chef_server_url', 'chef_validator_name',
-                     'chef_validation', 'chef_environment'}
+    REQUIRED_ARGS = {'chef_server_url', 'validation_client_name',
+                     'validation_key', 'environment'}
     DIRS = {
         'cache_path': 'cache'
     }
@@ -388,7 +385,7 @@ class ChefClientManager(ChefManager):
     def __init__(self, *args,  **kwargs):
         super(ChefClientManager, self).__init__(*args, **kwargs)
         ctx = self.ctx
-        for k in 'chef_node_name_prefix', 'chef_node_name_suffix':
+        for k in 'node_name_prefix', 'node_name_suffix':
             if k not in ctx.properties['chef_config']:
                 raise RuntimeError("Missing chef_config.{0} parameter".format(
                                    k))
@@ -411,10 +408,10 @@ class ChefClientManager(ChefManager):
         ctx = self.ctx
         chef_data_root = self.get_chef_data_root()
 
-        if ctx.properties['chef_config'].get('chef_validation'):
+        if ctx.properties['chef_config'].get('validation_key'):
             self._sudo_write_file(
                 self.get_path('etc', 'validation.pem'),
-                ctx.properties['chef_config']['chef_validation'])
+                ctx.properties['chef_config']['validation_key'])
 
         node_name = self.get_chef_node_name()
 
@@ -423,9 +420,9 @@ class ChefClientManager(ChefManager):
             self.get_chef_common_config() +
             'node_name              "{node_name}"\n'
             'ssl_verify_mode        :verify_none\n'
-            'validation_client_name "{chef_validator_name}"\n'
+            'validation_client_name "{validation_client_name}"\n'
             'chef_server_url        "{chef_server_url}"\n'
-            'environment            "{chef_environment}"\n'
+            'environment            "{environment}"\n'
             'validation_key         "{chef_data_root}/etc/validation.pem"\n'
             'client_key             "{chef_data_root}/etc/client.pem"\n'
             'log_location           "{chef_data_root}/log/client.log"\n'
@@ -451,7 +448,7 @@ class ChefSoloManager(ChefManager):
     """ Installs Chef solo """
 
     NAME = 'solo'
-    REQUIRED_ARGS = {'chef_cookbooks'}
+    REQUIRED_ARGS = {'cookbooks'}
     DIRS = {
         'sandbox_path': 'sandbox'
     }
@@ -514,11 +511,9 @@ class ChefSoloManager(ChefManager):
         ctx = self.ctx
         cc = ctx.properties['chef_config']
         file_name = self.get_path(SOLO_COOKBOOKS_FILE)
-        for dl in [('chef_environments', 'environments'),
-                   ('chef_databags', 'data_bags'),
-                   ('chef_roles', 'roles')]:
-            self._url_to_dir(cc.get(dl[0]), self.get_path(dl[1]))
-        is_resource, path = is_resource_url(cc['chef_cookbooks'])
+        for dl in 'environments', 'data_bags', 'roles':
+            self._url_to_dir(cc.get(dl), self.get_path(dl))
+        is_resource, path = is_resource_url(cc['cookbooks'])
         if is_resource:
             ctx.logger.info("Getting Chef cookbooks resource {0} to {1}"
                             .format(path, file_name))
@@ -527,8 +522,8 @@ class ChefSoloManager(ChefManager):
             os.remove(resource_local_file)
         else:
             ctx.logger.info("Downloading Chef cookbooks from {0} to {1}"
-                            .format(cc['chef_cookbooks'], file_name))
-            data = requests.get(cc['chef_cookbooks']).content
+                            .format(cc['cookbooks'], file_name))
+            data = requests.get(cc['cookbooks']).content
             self._sudo_write_file(file_name, data)
 
     def _get_cmd(self, runlist):
@@ -536,14 +531,14 @@ class ChefSoloManager(ChefManager):
         cookbooks_file_path = self.get_path(SOLO_COOKBOOKS_FILE)
         cmd = ["chef-solo"]
 
-        if (ctx.properties['chef_config'].get('chef_environment', '_default')
+        if (ctx.properties['chef_config'].get('environment', '_default')
                 != '_default'):
             v = self.get_version()
             if map(int, v.split('.')) < ENVS_MIN_VER:
                 raise ChefError("Chef solo environments are supported "
                                 "starting at {0} but you are using {1}".
                                 format(ENVS_MIN_VER_STR, v))
-            cmd += ["-E", ctx.properties['chef_config']['chef_environment']]
+            cmd += ["-E", ctx.properties['chef_config']['environment']]
         cmd += [
             "-c", self.get_path('etc', 'solo.rb'),
             "-o", runlist,
@@ -642,7 +637,7 @@ def _process_rel_runtime_props(ctx, data):
 
 def _prepare_chef_attributes(ctx):
 
-    chef_attributes = ctx.properties['chef_config'].get('chef_attributes', {})
+    chef_attributes = ctx.properties['chef_config'].get('attributes', {})
 
     if 'cloudify' in chef_attributes:
         raise ValueError("Chef attributes must not contain 'cloudify'")
