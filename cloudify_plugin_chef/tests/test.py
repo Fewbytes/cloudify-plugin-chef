@@ -42,13 +42,13 @@ node_id = itertools.count(100)
 def _make_context(installation_type='solo', operation=None,
                   merge_chef_attributes=None, related=None):
     props = copy.deepcopy(tests_config[installation_type]['properties'])
-    props.setdefault('chef_attributes', {})
-    props['chef_attributes'].setdefault('create_file', {})
-    props['chef_attributes']['create_file'].setdefault(
+    props.setdefault('attributes', {})
+    props['attributes'].setdefault('create_file', {})
+    props['attributes']['create_file'].setdefault(
         'file_name', CHEF_CREATED_FILE_NAME)
-    props['chef_attributes']['create_file'].setdefault(
+    props['attributes']['create_file'].setdefault(
         'file_contents', CHEF_CREATED_FILE_CONTENTS)
-    props['chef_attributes'].update(merge_chef_attributes or {})
+    props['attributes'].update(merge_chef_attributes or {})
     ctx = MockCloudifyContext(
         node_id='clodufiy_app_node_id_{0}_{1}'.format(
             node_id.next(), os.getpid()),
@@ -104,14 +104,14 @@ class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
         output = subprocess.check_output(['sudo', 'chef-client', '-v'])
         m = re.match('^Chef: ([0-9.]+)', output)
         expected_version, _, _ = tests_config['solo'][
-            'properties']['chef_version'].partition('-')
+            'properties']['version'].partition('-')
         self.assertEquals(m.group(1), expected_version)
 
     def test_chef_operation(self):
         ctx = self._make_context(operation='install')
         chef_operations.operation(ctx)
         create_file_attrs = ctx.properties[
-            'chef_config']['chef_attributes']['create_file']
+            'chef_config']['attributes']['create_file']
         f = create_file_attrs['file_name']
         c = create_file_attrs['file_contents']
         self.assertEquals(open(f).read(), c)
@@ -138,7 +138,7 @@ class ChefPluginAttrubutesPassingTestBase(object):
             if has_prop_key:
                 runtime_properties['prop1'] = 'prop_val'
             if has_chef_attr_key:
-                runtime_properties['chef_attributes'] = {
+                runtime_properties['attributes'] = {
                     'prop1': 'chef_attr_val'
                 }
             related = MockCloudifyContext(
@@ -297,7 +297,7 @@ class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
             chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
         try:
             chef_manager.run(
-                '', ctx.properties['chef_config']['chef_attributes'])
+                '', ctx.properties['chef_config']['attributes'])
         except chef_client.ChefError:
             self.fail("Chef run failed")
 
