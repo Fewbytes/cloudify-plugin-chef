@@ -1,47 +1,27 @@
 #!/usr/bin/env python
 
-import copy
 import itertools
 import os
 import random
-import re
 import string
-import subprocess
 import tempfile
 import unittest
 
 
 from cloudify.mocks import MockCloudifyContext
 
-import cosmo_plugin_common as cpc
-
 import cloudify_plugin_chef.chef_client as chef_client
-import cloudify_plugin_chef.operations as chef_operations
-
-# Run on target machine!!!
-SAFETY_FILE = '/tmp/do-run-chef-tests'
-FILE_SERVER_PORT = '50000'
 
 CHEF_CREATED_FILE_NAME = '/tmp/cloudify_plugin_chef_test.txt'
 CHEF_CREATED_FILE_CONTENTS = ''.join([random.choice(
     string.ascii_uppercase + string.digits) for x in range(6)])
-
-
-class TestsConfig(cpc.Config):
-    which = 'chef_tests'
-
-os.environ.setdefault('CHEF_TESTS_CONFIG_PATH',
-                      os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                   'chef_tests.json'))
-
-tests_config = TestsConfig().get()
 
 node_id = itertools.count(100)
 
 
 def _make_context(installation_type='solo', operation=None,
                   merge_chef_attributes=None, related=None):
-    props = copy.deepcopy(tests_config[installation_type]['properties'])
+    props = {}
     props.setdefault('attributes', {})
     props['attributes'].setdefault('create_file', {})
     props['attributes']['create_file'].setdefault(
@@ -55,10 +35,7 @@ def _make_context(installation_type='solo', operation=None,
         operation='cloudify.interfaces.lifecycle.' +
         (operation or 'INVALID'),
         properties={'chef_config': props},
-        related=related,
-        resources={
-            '/cookbooks.tar.gz': os.path.abspath('cookbooks.tar.gz'),  # XXX: untested change
-        },
+        related=related
     )
     return ctx
 
@@ -68,53 +45,6 @@ class ChefPluginTest(object):
     def _make_context(self, operation=None, merge_chef_attributes=None):
         return _make_context(self.__class__.INSTALLATION_TYPE, operation,
                              merge_chef_attributes)
-
-
-class ChefPluginWithHTTPServer(ChefPluginTest):
-
-    def setUp(self):
-        if os.getuid() == 0:
-            raise RuntimeError(
-                "Can not run tests as root, please use a sudo-enabled user")
-        if not os.path.exists(SAFETY_FILE):
-            raise RuntimeError(
-                "Safety file {0} does not exist. Make sure you run these "
-                "tests on target host.".format(SAFETY_FILE))
-        os.chdir(os.path.dirname(__file__))
-        subprocess.call(['tar', 'czf', 'cookbooks.tar.gz', 'cookbooks'])
-        subprocess.call(['fuser', '-s', '-k', FILE_SERVER_PORT + '/tcp'])
-        subprocess.Popen(
-            ['python', '-m', 'SimpleHTTPServer', FILE_SERVER_PORT])
-        # subprocess.call(['fuser', '-k', FILE_SERVER_PORT + '/tcp'])
-
-    def tearDown(self):
-        subprocess.call(['fuser', '-s', '-k', FILE_SERVER_PORT + '/tcp'])
-
-
-class ChefPluginInstallationTest(ChefPluginWithHTTPServer):
-
-    def test_chef_installation(self):
-        """Run Chef installation and check for expected"""
-        # Assumption: chef-client version is the same
-        ctx = self._make_context()
-        chef_manager = chef_client.get_manager(ctx)
-        self.assertIsInstance(
-            chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
-        chef_manager.install()
-        output = subprocess.check_output(['sudo', 'chef-client', '-v'])
-        m = re.match('^Chef: ([0-9.]+)', output)
-        expected_version, _, _ = tests_config['solo'][
-            'properties']['version'].partition('-')
-        self.assertEquals(m.group(1), expected_version)
-
-    def test_chef_operation(self):
-        ctx = self._make_context(operation='install')
-        chef_operations.operation(ctx)
-        create_file_attrs = ctx.properties[
-            'chef_config']['attributes']['create_file']
-        f = create_file_attrs['file_name']
-        c = create_file_attrs['file_contents']
-        self.assertEquals(open(f).read(), c)
 
 
 class ChefPluginAttrubutesPassingTestBase(object):
@@ -138,7 +68,7 @@ class ChefPluginAttrubutesPassingTestBase(object):
             if has_prop_key:
                 runtime_properties['prop1'] = 'prop_val'
             if has_chef_attr_key:
-                runtime_properties['attributes'] = {
+                runtime_properties['chef_attributes'] = {
                     'prop1': 'chef_attr_val'
                 }
             related = MockCloudifyContext(
@@ -276,46 +206,6 @@ ChefPluginAttrubutesPassingTest = type(
     'ChefPluginAttrubutesPassingTest',
     (ChefPluginTest, unittest.TestCase, b),
     methods)
-
-
-class ChefPluginSoloTest(ChefPluginInstallationTest, unittest.TestCase):
-
-    INSTALLATION_TYPE = 'solo'
-    CORRECT_CHEF_MANAGER = chef_client.ChefSoloManager
-
-
-class ChefPluginClientTest(ChefPluginInstallationTest, unittest.TestCase):
-
-    INSTALLATION_TYPE = 'client'
-    CORRECT_CHEF_MANAGER = chef_client.ChefClientManager
-
-    def test_chef_installation(self):
-        super(ChefPluginClientTest, self).test_chef_installation()
-        ctx = self._make_context()
-        chef_manager = chef_client.get_manager(ctx)
-        self.assertIsInstance(
-            chef_manager, self.__class__.CORRECT_CHEF_MANAGER)
-        try:
-            chef_manager.run(
-                '', ctx.properties['chef_config']['attributes'])
-        except chef_client.ChefError:
-            self.fail("Chef run failed")
-
-
-class ChefPluginAttributesCaptureTest(ChefPluginWithHTTPServer,
-                                      unittest.TestCase):
-
-    def test_attributes_capture(self):
-        ctx = _make_context(operation='install')
-        chef_operations.operation(ctx)
-        self.assertIn('chef_attributes', ctx.runtime_properties)
-        for a in 'roles', 'recipes', 'tags':
-            self.assertIn(a, ctx.runtime_properties['chef_attributes'])
-
-
-class ContextTostructTest(ChefPluginTest, unittest.TestCase):
-
-    """ TODO """
 
 
 class LockTest(ChefPluginTest, unittest.TestCase):
