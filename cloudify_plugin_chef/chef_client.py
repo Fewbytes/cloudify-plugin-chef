@@ -457,7 +457,8 @@ class ChefSoloManager(ChefManager):
     def _url_to_dir(self, url, dst_dir):
         """
         Downloads .tar.gz from `url` and extracts to `dst_dir`.
-        If URL is relative ("/xyz.tar.gz"), it's fetched using download_resource().
+        If URL is relative ("/xyz.tar.gz"), it's fetched using
+        download_resource().
         """
 
         if url is None:
