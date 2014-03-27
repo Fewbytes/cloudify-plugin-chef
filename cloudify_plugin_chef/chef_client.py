@@ -639,9 +639,6 @@ def _prepare_chef_attributes(ctx):
 
     chef_attributes = ctx.properties['chef_config'].get('attributes', {})
 
-    if 'cloudify' in chef_attributes:
-        raise ValueError("Chef attributes must not contain 'cloudify'")
-
     # If chef_attributes is JSON
     if isinstance(chef_attributes, basestring) and chef_attributes != '':
         try:
@@ -650,6 +647,9 @@ def _prepare_chef_attributes(ctx):
             raise ChefError(
                 "Failed json validation of chef chef_attributes:\n"
                 "{0}".format(chef_attributes))
+
+    if 'cloudify' in chef_attributes:
+        raise ValueError("Chef attributes must not contain 'cloudify'")
 
     chef_attributes = chef_attributes.copy()
     chef_attributes['cloudify'] = _context_to_struct(ctx)
