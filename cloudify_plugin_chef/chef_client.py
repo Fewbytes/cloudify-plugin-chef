@@ -457,7 +457,7 @@ class ChefSoloManager(ChefManager):
     def _url_to_dir(self, url, dst_dir):
         """
         Downloads .tar.gz from `url` and extracts to `dst_dir`.
-        If URL is relative ("/xyz.tar.gz"), it's fetched using get_resource().
+        If URL is relative ("/xyz.tar.gz"), it's fetched using download_resource().
         """
 
         if url is None:
@@ -474,7 +474,7 @@ class ChefSoloManager(ChefManager):
         if is_resource:
             ctx.logger.info("Getting resource {0} to {1}".format(path,
                             temp_archive.name))
-            ctx.get_resource(path, temp_archive.name)
+            ctx.download_resource(path, temp_archive.name)
         else:
             ctx.logger.info("Downloading from {0} to {1}".format(url,
                             temp_archive.name))
@@ -517,7 +517,7 @@ class ChefSoloManager(ChefManager):
         if is_resource:
             ctx.logger.info("Getting Chef cookbooks resource {0} to {1}"
                             .format(path, file_name))
-            resource_local_file = ctx.get_resource(path)
+            resource_local_file = ctx.download_resource(path)
             self._sudo("cp", resource_local_file, file_name)
             os.remove(resource_local_file)
         else:
