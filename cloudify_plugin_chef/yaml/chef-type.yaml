@@ -73,7 +73,10 @@ types:
                 #
                 # - runlist   (optional)
                 #
-                # `runlist` - the runlist to pass to Chef.
+                # `runlist` - the runlist to pass to Chef. For convenience,
+                # it can be specified as YAML list and not as the Chef-expected
+                # string. In that case it will be just joined using commas to a
+                # string.
                 #
                 # - runlists  (optional)
                 #            # cloudify.interfaces.lifecycle.X
@@ -97,6 +100,38 @@ types:
                 # If `runlists` does not have a runlist for current operation,
                 # a warning is issued. To suppress it, add the operation to
                 # `runlists` using `null` as the value.
+                #
+                # - attributes
+                #
+                # `attributes` are the attributes to pass to Chef. They are
+                # put in a JSON file. Chef is invoked with the file name as
+                # an argument.
+                #
+                # It's an error if `attributes` have `cloudify` section.
+                # The reason is that `cloudify` section is added
+                # automatically by the Cloudify Chef plugin and we are avoiding
+                # the possible collision.
+                #
+                # Any value can be a reference to a Cloudify runtime property
+                # or Chef attribute of related YAML node when using
+                # relationships. For example:
+                #     - attributes:
+                #         my_attr1: {related_chef_attribute: his.sub.attr}
+                #         my_attr2: {related_runtime_property: other_prop}
+                #
+                # Such reference can also have default value:
+                #     - attributes:
+                #         my_attr1:
+                #             related_chef_attribute: his.sub.attr
+                #             default_value: 4096
+                #
+                # Default value must be specified if there is any runlist
+                # that will run without related node (a runlist for any
+                # non-relationship operation).
+                #
+                # Default value will be used if there is no related node
+                # or if the specified chef attribute or runtime property
+                # does not exist.
                 #
                 # Common for Solo and Client - end
         interfaces:
