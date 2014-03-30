@@ -2,12 +2,39 @@
 # /etc/sudoers must not have "Default requiretty" for Chef plugin to work
 #
 # WARNING:
-# Using different Chef versions on same server was not tested. This should
-# work very slow as Chef installation is server global so Chef will be
-# removed and other Chef version will be installed many times.
+# It is not recommended to use different Chef versions on same server and we
+# do not test such configuration. Example:
+#
+#     nodes:
+#         -
+#             name: server
+#             ...
+#         -
+#             name: chef_node_1
+#             type: app_server_chef
+#             properties:
+#                 chef_config:
+#                     version: 11.10.4-1  # *** Different versions ***
+#                     ...
+#             relationships:
+#                 -
+#                     type: cloudify.relationships.contained_in
+#                     target: server  # *** Same server ***
+#         -
+#             name: chef_node_2
+#             type: app_server_chef
+#             properties:
+#                 chef_config:
+#                     version: 10  # *** Different versions ***
+#                     ...
+#             relationships:
+#                 -
+#                     type: cloudify.relationships.contained_in
+#                     target: server  # *** Same server ***
+#
 #
 # WARNING:
-# Chef uninstall was not tested
+# Chef uninstall is not supported at this time.
 
 imports:
     - 'cloudify.types'
@@ -132,6 +159,16 @@ types:
                 # Default value will be used if there is no related node
                 # or if the specified chef attribute or runtime property
                 # does not exist.
+                #
+                # - version (required)
+                #
+                # `version` is the Chef Client / Solo version to install
+                # and use on the server. See
+                # http://www.getchef.com/chef/install/ , "Chef Client"
+                # section.
+                #
+                # Use the full version number. Example: `11.10.4-1`,
+                # `10.30.4-1`, ...
                 #
                 # Common for Solo and Client - end
         interfaces:
